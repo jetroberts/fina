@@ -1,1 +1,1 @@
-mod example.rs
+mod example;

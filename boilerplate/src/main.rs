@@ -1,7 +1,7 @@
 use std::error::Error;
 
 mod models;
-mod services
+mod services;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
