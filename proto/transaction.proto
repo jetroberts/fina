@@ -1,0 +1,22 @@
+syntax = "proto3";
+package transaction;
+
+service Transactor {
+  rpc get_transaction (get_request) returns (get_response) {}
+}
+
+message get_response {
+  string id = 1;
+  float amount = 2;
+  string transaction_type = 3;
+  int32 timestamp = 4;
+  string user = 5;
+  string category = 6;
+  int32 created_at = 7;
+  int32 updated_at = 8;
+  int32 deleted_at = 9;
+}
+
+message get_request {
+  string id = 1;
+}
