@@ -7,7 +7,7 @@ struct Transaction {
     transaction_type: String,
     timestamp: DateTime<Utc>,
     user: String,
-    category: Category,
+    category: Option<Category>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
     deleted_at: Option<DateTime<Utc>>,

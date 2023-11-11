@@ -2,7 +2,8 @@ syntax = "proto3";
 package transaction;
 
 service Transactor {
-  rpc get_transaction (get_request) returns (get_response) {}
+  rpc get (get_request) returns (get_response) {}
+  rpc add (add_request) returns (add_response) {}
 }
 
 message get_response {
@@ -19,4 +20,16 @@ message get_response {
 
 message get_request {
   string id = 1;
+}
+
+message add_request {
+  string id = 1;
+  float amount = 2;
+  string transaction_type = 3;
+  int32 timestamp = 4;
+  string user = 5;
+}
+
+message add_response {
+  bool success = 1;
 }

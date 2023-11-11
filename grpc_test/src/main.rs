@@ -1,5 +1,6 @@
 use std::{error::Error, time::Instant};
 
+mod database;
 mod models;
 mod services;
 
