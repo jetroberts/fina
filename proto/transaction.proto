@@ -26,7 +26,7 @@ message add_request {
   string id = 1;
   float amount = 2;
   string transaction_type = 3;
-  int32 timestamp = 4;
+  string timestamp = 4;
   string user = 5;
 }
 

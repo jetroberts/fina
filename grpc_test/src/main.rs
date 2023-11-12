@@ -1,6 +1,5 @@
 use std::{error::Error, time::Instant};
 
-mod database;
 mod models;
 mod services;
 
@@ -16,15 +15,13 @@ use crate::trans::transactor_client::TransactorClient;
 async fn main() -> Result<(), Box<dyn Error>> {
     let mut client = TransactorClient::connect("http://[127.0.0.1]:50051").await?;
 
-    for _ in 0..100 {
+    loop {
         let request = tonic::Request::new(GetRequest {
             id: "1".to_string(),
         });
 
         let now = Instant::now();
-        let _res = client.get_transaction(request).await?;
+        let _res = client.get(request).await?;
         println!("TIME={:?}", now.elapsed());
     }
-
-    Ok(())
 }

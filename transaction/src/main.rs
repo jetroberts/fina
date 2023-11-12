@@ -31,12 +31,22 @@ impl TransactionController {
 
 #[tonic::async_trait]
 impl Transactor for TransactionController {
-    async fn get(&self, request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
-        self.service.get_transaction()?;
+    async fn get(&self, _request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
+        let res = match self.service.get_transaction() {
+            Ok(r) => r,
+            Err(e) => return Err(Status::new(tonic::Code::Internal, e.to_string())),
+        };
+
+        Ok(Response::new(res))
     }
 
     async fn add(&self, request: Request<AddRequest>) -> Result<Response<AddResponse>, Status> {
-        todo!();
+        let res = match self.service.add_transaction(request.into_inner()) {
+            Ok(r) => r,
+            Err(e) => return Err(Status::new(tonic::Code::Internal, e.to_string())),
+        };
+
+        Ok(Response::new(res))
     }
 }
 
