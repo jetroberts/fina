@@ -1,4 +1,4 @@
-use crate::services::transaction_service::{DatabaseInit, DatabaseRead, DatabaseWrite};
+use crate::services::transaction_service::{DatabaseInit, DatabaseRead, DatabaseWrite, GetId};
 
 pub struct Redis {
     client: Option<redis::Client>,
@@ -32,15 +32,11 @@ impl DatabaseInit for Redis {
 }
 
 impl DatabaseWrite for Redis {
-    fn save<T: ToString>(
-        &mut self,
-        id: String,
-        record: T,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn save<T: ToString + GetId>(&mut self, record: T) -> Result<(), Box<dyn std::error::Error>> {
         match self.connection.as_mut() {
             Some(c) => {
                 redis::cmd("HSET")
-                    .arg(id)
+                    .arg(record.get_id())
                     .arg(record.to_string())
                     .query(c)?;
             }

@@ -1,6 +1,7 @@
-use std::error::Error;
+use std::{error::Error, sync::Arc};
 
 use chrono::Utc;
+use tokio::sync::Mutex;
 
 use crate::{
     models::transactions::Transaction,
@@ -12,8 +13,12 @@ pub trait DatabaseInit {
     fn disconnect(&mut self) -> Result<(), Box<dyn Error>>;
 }
 
+pub trait GetId {
+    fn get_id(&self) -> String;
+}
+
 pub trait DatabaseWrite {
-    fn save<T: ToString>(&mut self, id: String, record: T) -> Result<(), Box<dyn Error>>;
+    fn save<T: ToString + GetId>(&mut self, record: T) -> Result<(), Box<dyn Error>>;
 }
 
 pub trait DatabaseRead {
@@ -24,7 +29,7 @@ pub struct TransactionService<T>
 where
     T: DatabaseInit + DatabaseWrite + DatabaseRead,
 {
-    db: T,
+    db: Arc<Mutex<T>>,
 }
 
 impl<T> TransactionService<T>
@@ -32,6 +37,7 @@ where
     T: DatabaseInit + DatabaseWrite + DatabaseRead,
 {
     pub fn new(db: T) -> Self {
+        let db = Arc::new(Mutex::new(db));
         Self { db }
     }
 
@@ -49,8 +55,12 @@ where
         })
     }
 
-    pub fn add_transaction(&mut self, request: AddRequest) -> Result<AddResponse, Box<dyn Error>> {
-        self.db.connect()?;
+    pub async fn add_transaction(
+        &self,
+        request: AddRequest,
+    ) -> Result<AddResponse, Box<dyn Error>> {
+        let mut database = self.db.lock().await;
+        database.connect()?;
 
         let timestamp = Utc::now();
 
@@ -61,7 +71,7 @@ where
             request.user,
         );
 
-        self.db.save("1".to_string(), new_transaction);
+        let _ = database.save(new_transaction);
 
         Ok(AddResponse { success: true })
     }

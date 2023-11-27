@@ -23,7 +23,6 @@ message get_request {
 }
 
 message add_request {
-  string id = 1;
   float amount = 2;
   string transaction_type = 3;
   string timestamp = 4;

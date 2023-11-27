@@ -1,5 +1,7 @@
 use chrono::{DateTime, Utc};
 
+use crate::services::transaction_service::GetId;
+
 pub struct Transaction {
     id: String,
     amount: f32,
@@ -31,6 +33,12 @@ impl Transaction {
             updated_at: Utc::now(),
             deleted_at: None,
         }
+    }
+}
+
+impl GetId for Transaction {
+    fn get_id(&self) -> String {
+        self.id.clone()
     }
 }
 

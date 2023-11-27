@@ -41,7 +41,7 @@ impl Transactor for TransactionController {
     }
 
     async fn add(&self, request: Request<AddRequest>) -> Result<Response<AddResponse>, Status> {
-        let res = match self.service.add_transaction(request.into_inner()) {
+        let res = match self.service.add_transaction(request.into_inner()).await {
             Ok(r) => r,
             Err(e) => return Err(Status::new(tonic::Code::Internal, e.to_string())),
         };

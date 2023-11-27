@@ -1,0 +1,30 @@
+package templates
+
+templ Layout(title string, header templ.Component, main templ.Component) {
+	<html>
+		<head>
+			<title>{ title }</title>
+			<link rel="stylesheet" href="/assets/styles.css"/>
+		</head>
+		<body>
+			<header>
+				@header
+			</header>
+			<main class="container">
+				@main
+			</main>
+		</body>
+	</html>
+}
+
+templ Home() {
+	@Layout("Home", Header("JR"), Content("Home Content"))
+}
+
+templ Header(str string) {
+	<h1 class="text-4xl">This is the header, { str }</h1>
+}
+
+templ Content(str string) {
+	<p>This is the content, { str }</p>
+}
