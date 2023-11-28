@@ -6,12 +6,13 @@ templ Layout(title string, header templ.Component, main templ.Component) {
 			<title>{ title }</title>
 			<link rel="stylesheet" href="/assets/styles.css"/>
 		</head>
-		<body>
+		<body class="container flex flex-col bg-red-100">
 			<header>
 				@header
 			</header>
-			<main class="container">
+			<main>
 				@main
+				<div></div>
 			</main>
 		</body>
 	</html>
