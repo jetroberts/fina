@@ -1,0 +1,56 @@
+package templates
+
+templ Layout(title string, header templ.Component, main templ.Component) {
+	<html>
+		<head>
+			<title>{ title }</title>
+			<link rel="stylesheet" href="/assets/styles.css"/>
+			<script src="https://unpkg.com/htmx.org@1.9.9" integrity="sha384-QFjmbokDn2DjBjq+fM+8LUIVrAgqcNW2s0PjAxHETgRn9l4fvX31ZxDxvwQnyMOX" crossorigin="anonymous"></script>
+		</head>
+		<body class="container flex flex-col m-auto justify-center">
+			<header class="border-black border-2 my-2 px-2">
+				@header
+			</header>
+			<div class="w-28"></div>
+			<main class="border-black border-2">
+				@main
+			</main>
+		</body>
+	</html>
+}
+
+templ Index() {
+	@Layout("Home", Header(), Content("Home Content"))
+}
+
+templ Header() {
+	<div class="flex h-48 w-full">
+		<div class="border-2 border-black w-full items-center justify-center flex">Income</div>
+		<div class="border-2 border-black w-full items-center justify-center flex">Outgoings</div>
+		<div class="border-2 border-black w-full items-center justify-center flex">Upload</div>
+	</div>
+}
+
+templ Content(str string) {
+	<div></div>
+}
+
+templ table() {
+	<table>
+		<thead>
+			<tr>
+				<th>Name</th>
+				<th>Date</th>
+				<th>Type</th>
+				<th>Amount</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td>£1000</td>
+				<td>£500</td>
+				<td>Upload</td>
+			</tr>
+		</tbody>
+	</table>
+}

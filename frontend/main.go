@@ -7,7 +7,7 @@ import (
 
 func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-		hello := templates.Home()
+		hello := templates.Index()
 		hello.Render(req.Context(), w)
 	})
 
