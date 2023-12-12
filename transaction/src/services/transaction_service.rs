@@ -8,6 +8,7 @@ use crate::{
     t::{AddRequest, AddResponse, GetResponse},
 };
 
+// TODO: move the database stuff into the database module
 pub trait DatabaseInit {
     fn connect(&mut self) -> Result<(), Box<dyn Error>>;
     fn disconnect(&mut self) -> Result<(), Box<dyn Error>>;
@@ -22,7 +23,7 @@ pub trait DatabaseWrite {
 }
 
 pub trait DatabaseRead {
-    fn find(&mut self, id: String) -> Result<(), Box<dyn Error>>;
+    fn find(&mut self, id: &str) -> Result<(), Box<dyn Error>>;
 }
 
 pub struct TransactionService<T>
@@ -41,7 +42,12 @@ where
         Self { db }
     }
 
-    pub fn get_transaction(&self) -> Result<GetResponse, Box<dyn Error>> {
+    pub async fn get_transaction(&self, id: &str) -> Result<GetResponse, Box<dyn Error>> {
+        let mut database = self.db.lock().await;
+
+        database.connect()?;
+        let _ = database.find(id);
+
         Ok(GetResponse {
             id: "1".to_string(),
             amount: 1.0,
