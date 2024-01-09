@@ -43,10 +43,15 @@ where
     }
 
     pub async fn get_transaction(&self, id: &str) -> Result<GetResponse, Box<dyn Error>> {
+        println!("Get request");
+        println!("Locking db mutex");
         let mut database = self.db.lock().await;
 
+        println!("Connecting to db");
         database.connect()?;
-        let _ = database.find(id);
+        println!("Connected to db");
+        let res = database.find(id);
+        println!("{:?}", res);
 
         Ok(GetResponse {
             id: "1".to_string(),

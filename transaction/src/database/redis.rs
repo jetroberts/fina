@@ -40,7 +40,7 @@ impl Display for RedisConnectionError {
 
 impl DatabaseInit for Redis {
     fn connect(&mut self) -> Result<(), Box<dyn Error>> {
-        let client = match redis::Client::open("redis://127.0.0.1/") {
+        let client = match redis::Client::open("redis://redis") {
             Ok(c) => c,
             Err(e) => {
                 eprintln!("Unable to create redis client, {}", e);

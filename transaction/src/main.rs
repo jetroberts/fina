@@ -56,7 +56,7 @@ impl Transactor for TransactionController {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let addr = "127.0.0.1:50051".parse().unwrap();
+    let addr = "0.0.0.0:50051".parse().unwrap();
     let transaction_server = TransactionController::new();
 
     println!("Transaction server listening on: {}", addr);

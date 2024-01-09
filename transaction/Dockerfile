@@ -8,7 +8,9 @@ COPY ./proto /usr/src/proto
 
 COPY ./transaction .
 
-RUN cargo build --release
+RUN rustup target add aarch64-unknown-linux-musl
+
+RUN cargo build --target aarch64-unknown-linux-musl --release
 
 FROM alpine:latest as production
 
@@ -16,8 +18,7 @@ RUN apk add --no-cache protoc
 
 WORKDIR /usr/src/app
 
-RUN apt-get update && apt-get install -y extra-runtime-dependencies && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /usr/src/app/target/release/transaction .
+COPY --from=builder /usr/src/app/target/aarch64-unknown-linux-musl/release/transaction /usr/local/bin/transaction
 
-CMD ["./transaction"]
+CMD ["transaction"]
 
