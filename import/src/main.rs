@@ -8,16 +8,22 @@ mod service;
 #[command(author, version, about)]
 struct Args {
     // start a web server
-    #[arg(short, long, default_value = "false")]
-    server: bool,
+    #[arg(short = 's', long, default_value = "false")]
+    enable_server: bool,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
-    if args.server {
-        server::start();
+    if args.enable_server {
+        let server = server::Server::new();
+        match server.start().await {
+            Ok(_) => (),
+            Err(e) => eprintln!("Error: {}", e),
+        };
         return;
     }
 
-    cli::start();
+    let cli = cli::Cli::new();
+    cli.start();
 }
