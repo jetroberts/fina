@@ -65,4 +65,13 @@ impl Service {
 
         Ok(parsed_transactions)
     }
+
+    pub fn parse_line(&self, data: String) -> Result<Vec<ParsedTransaction>, String> {
+        let mut csv_reader = csv::Reader::from_reader(data.as_bytes());
+        for record in csv_reader.records() {
+            println!("{:?}", record.expect("unable to read record"));
+        }
+
+        Ok(Vec::new())
+    }
 }

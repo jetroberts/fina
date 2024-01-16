@@ -1,7 +1,4 @@
-use std::{
-    io::BufRead,
-    sync::{Arc, Mutex, RwLock},
-};
+use std::sync::{Arc, RwLock};
 
 use axum::{
     extract::Multipart,
@@ -27,7 +24,7 @@ impl Server {
         let app = Router::new()
             .route("/", get("Ok"))
             .route("/upload", post(upload))
-            .layer(Extension(self.parse_server.clone()));
+            .layer(self.parse_server.clone());
 
         let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
             .await
@@ -43,11 +40,9 @@ impl Server {
 }
 
 async fn upload(
-    Extension(parse_service): Extension<Arc<Mutex<Service>>>,
+    Extension(parse_server): Extension<Arc<RwLock<Service>>>,
     mut multipart: Multipart,
 ) -> Result<StatusCode, ()> {
-    let mut count = 0;
-
     while let Some(field) = multipart
         .next_field()
         .await
@@ -57,10 +52,9 @@ async fn upload(
             println!("filename: {}", filename)
         }
 
-        if let Ok(bytes) = field.bytes().await {
-            if let Ok(ps) = parse_service.lock() {
-                ps.parse(bytes.as_ref());
-            }
+        if let Ok(data) = field.text().await {
+            // TODO: parse the data
+            if let Ok(ps) = parse_server {}
         }
     }
 
