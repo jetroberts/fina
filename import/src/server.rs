@@ -7,7 +7,7 @@ use axum::{
     Extension, Router,
 };
 
-use crate::service::service::Service;
+use crate::service::parse_service::Service;
 
 pub struct Server {
     parse_server: Arc<RwLock<Service>>,
@@ -24,7 +24,7 @@ impl Server {
         let app = Router::new()
             .route("/", get("Ok"))
             .route("/upload", post(upload))
-            .layer(self.parse_server.clone());
+            .layer(Extension(self.parse_server.clone()));
 
         let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
             .await
@@ -52,10 +52,20 @@ async fn upload(
             println!("filename: {}", filename)
         }
 
+        let mut transactions = Vec::new();
         if let Ok(data) = field.text().await {
-            // TODO: parse the data
-            if let Ok(ps) = parse_server {}
+            if let Ok(ps) = parse_server.write() {
+                transactions = match ps.parse_data(data) {
+                    Ok(transactions) => transactions,
+                    Err(e) => {
+                        eprintln!("Error trying to parse data: {}", e);
+                        vec![]
+                    }
+                };
+            }
         }
+
+        println!("transactions: {:?}", transactions);
     }
 
     Ok(StatusCode::OK)

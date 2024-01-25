@@ -1,6 +1,6 @@
 use std::fs::File;
 
-use crate::service::service::{AccountType, Config, Service};
+use crate::service::parse_service::{AccountType, Config, Service};
 
 pub struct Cli {
     parse_service: Service,

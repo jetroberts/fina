@@ -5,7 +5,7 @@ services:
     image: fina
     build:
       context: ./
-      dockerfile: ./transaction/Dockerfile
+      dockerfile: ./expr/Dockerfile
     ports:
       - "50051:50051"
     networks:
