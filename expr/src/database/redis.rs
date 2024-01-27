@@ -1,5 +1,8 @@
 use std::{error::Error, fmt::Display};
 
+use redis::{Commands, RedisResult};
+use serde::{Deserialize, Serialize};
+
 use super::base::{DatabaseError, DatabaseInit, DatabaseRead, DatabaseWrite};
 
 pub struct Redis {
@@ -61,16 +64,40 @@ impl DatabaseInit for Redis {
 }
 
 impl DatabaseWrite for Redis {
-    fn save<T: ToString>(&mut self, record: T) -> Result<(), Box<dyn Error>> {
+    fn save<T: ToString + Serialize>(&mut self, record: T) -> Result<(), DatabaseError> {
+        if self.connection.is_none() {
+            self.connect()?;
+            println!("Redis connection was None, attempting to connect");
+        }
+
         match self.connection.as_mut() {
             Some(c) => {
-                redis::cmd("HSET")
-                    .arg(create_new_uuid())
-                    .arg(record.to_string())
-                    .query(c)?;
+                let uuid = create_new_uuid();
+                println!("Saving record with uuid: {}", uuid);
+
+                let json = serde_json::to_string(&record)
+                    .map_err(|e| DatabaseError::JsonError(e.to_string()))?;
+
+                redis::cmd("SET")
+                    .arg(uuid.clone())
+                    .arg(json)
+                    .query(c)
+                    .map_err(|e| DatabaseError::SaveError(e.to_string()))?;
+
+                // need to figure out a good secondary index for searching by a subset of records
+                // redis::cmd("SADD")
+                // .arg(format!("Amex"))
+                // .arg(uuid)
+                // .query(c)
+                // .map_err(|e| DatabaseError::SaveError(e.to_string()))?;
+
+                println!("Record saved");
             }
             None => {
-                return Err("Redis connection was None".into());
+                eprintln!("Redis connection was None");
+                return Err(DatabaseError::SaveError(
+                    "Redis connection was None".to_string(),
+                ));
             }
         }
 
@@ -79,15 +106,32 @@ impl DatabaseWrite for Redis {
 }
 
 impl DatabaseRead for Redis {
-    fn find(&mut self, id: &str) -> Result<(), Box<dyn Error>> {
-        match self.connection.as_mut() {
-            Some(c) => {
-                redis::cmd("HGET").arg(id).query(c)?;
-            }
-            None => return Err("Redis connection was None".into()),
+    fn find<T: for<'a> Deserialize<'a>>(&mut self, id: &str) -> Result<T, DatabaseError> {
+        if self.connection.is_none() {
+            self.connect()?;
         }
 
-        Ok(())
+        match self.connection.as_mut() {
+            Some(c) => {
+                let res: String = c
+                    .get(id)
+                    .map_err(|e| DatabaseError::GetError(e.to_string()))?;
+
+                let json: T = serde_json::from_str(&res)
+                    .map_err(|e| DatabaseError::JsonError(e.to_string()))?;
+
+                return Ok(json);
+            }
+            None => {
+                return Err(DatabaseError::ConnectionError(
+                    "No connection found whilst trying to find record".to_string(),
+                ))
+            }
+        }
+    }
+
+    fn find_all<T>(&mut self) -> Result<Vec<T>, DatabaseError> {
+        return Ok(Vec::new());
     }
 }
 

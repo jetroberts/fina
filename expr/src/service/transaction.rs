@@ -4,11 +4,22 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use serde::{Deserialize, Serialize};
+
 use crate::database::base::{DatabaseInit, DatabaseRead, DatabaseWrite};
 
 use super::parse::ParsedTransaction;
 
-enum TransactionError {
+#[derive(Serialize, Deserialize)]
+pub struct Transaction {
+    id: String,
+    account_type: String,
+    date: String,
+    amount: f64,
+    description: String,
+}
+
+pub enum TransactionError {
     DatabaseError(String),
 }
 
@@ -24,16 +35,16 @@ impl Display for TransactionError {
 
 pub struct TransactionService<T>
 where
-    T: DatabaseInit + DatabaseWrite + DatabaseRead,
+    for<'a> T: DatabaseInit + DatabaseWrite + DatabaseRead,
 {
     db: Arc<Mutex<T>>,
 }
 
 impl<T> TransactionService<T>
 where
-    T: DatabaseInit + DatabaseWrite + DatabaseRead,
+    for<'a> T: DatabaseInit + DatabaseWrite + DatabaseRead,
 {
-    pub fn new(db: T) -> Self {
+    pub fn new(db: T) -> TransactionService<T> {
         let db = Arc::new(Mutex::new(db));
         Self { db }
     }
@@ -52,5 +63,18 @@ where
             .map_err(|e| TransactionError::DatabaseError(e.to_string()))?;
 
         Ok(())
+    }
+
+    pub fn find_transaction(&self, id: &str) -> Result<Transaction, TransactionError> {
+        let mut db_connection = self
+            .db
+            .lock()
+            .map_err(|e| TransactionError::DatabaseError(e.to_string()))?;
+
+        let transaction: Transaction = db_connection
+            .find(id)
+            .map_err(|e| TransactionError::DatabaseError(e.to_string()))?;
+
+        return Ok(transaction);
     }
 }

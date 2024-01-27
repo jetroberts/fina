@@ -3,6 +3,8 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use serde::{Deserialize, Serialize};
+
 use crate::database::redis::Redis;
 
 use super::transaction::TransactionService;
@@ -11,7 +13,7 @@ pub struct Service {
     transaction_service: Arc<RwLock<TransactionService<Redis>>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ParsedTransaction {
     account_type: String,
     date: String,
@@ -65,7 +67,7 @@ impl Service {
 
     pub fn parse_data(&self, extraction_config: Config, data: String) -> Result<(), ParseError> {
         let mut csv_reader = csv::Reader::from_reader(data.as_bytes());
-        let mut transaction_service = self
+        let transaction_service = self
             .transaction_service
             .write()
             .map_err(|e| ParseError::RwLockError(e.to_string()))?;
@@ -82,7 +84,7 @@ impl Service {
                 .map_err(|e| ParseError::AmountConversionError(e.to_string()))?;
 
             let new_transaction = ParsedTransaction {
-                account_type: extraction_config.name,
+                account_type: extraction_config.name.clone(),
                 amount,
                 date: date.to_string(),
                 description: description.to_string(),

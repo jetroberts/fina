@@ -280,6 +280,8 @@ dependencies = [
  "clap",
  "csv",
  "redis",
+ "serde",
+ "serde_json",
  "tokio",
  "uuid",
 ]

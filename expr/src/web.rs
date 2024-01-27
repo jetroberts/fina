@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 
 use axum::{
-    extract::Multipart,
+    extract::{Multipart, Path},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -33,10 +33,11 @@ impl Server {
         let app = Router::new()
             .route("/", get("Ok"))
             .route("/upload", post(upload))
+            .route("/transactions/:id", get(get_transaction))
             .layer(Extension(self.parse_service.clone()))
             .layer(Extension(self.transactions_service.clone()));
 
-        let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+        let listener = tokio::net::TcpListener::bind("0.0.0.0:50051")
             .await
             .expect("enable to bind to port 3000");
 
@@ -49,18 +50,20 @@ impl Server {
     }
 }
 
-enum UploadError {
+enum ServerError {
     MultipartError(String),
     ParseError(String),
     ServiceError(String),
+    NoValue(String),
 }
 
-impl IntoResponse for UploadError {
+impl IntoResponse for ServerError {
     fn into_response(self) -> Response {
         match self {
-            UploadError::MultipartError(_) => StatusCode::BAD_REQUEST.into_response(),
-            UploadError::ParseError(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-            UploadError::ServiceError(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            ServerError::MultipartError(c) => (StatusCode::BAD_REQUEST, c).into_response(),
+            ServerError::ParseError(c) => (StatusCode::INTERNAL_SERVER_ERROR, c).into_response(),
+            ServerError::ServiceError(c) => (StatusCode::INTERNAL_SERVER_ERROR, c).into_response(),
+            ServerError::NoValue(c) => (StatusCode::BAD_REQUEST, c).into_response(),
         }
     }
 }
@@ -68,11 +71,11 @@ impl IntoResponse for UploadError {
 async fn upload(
     Extension(parse_service): Extension<Arc<RwLock<Service>>>,
     mut multipart: Multipart,
-) -> Result<StatusCode, UploadError> {
+) -> Result<StatusCode, ServerError> {
     while let Some(field) = multipart
         .next_field()
         .await
-        .map_err(|e| UploadError::MultipartError(e.to_string()))?
+        .map_err(|e| ServerError::MultipartError(e.to_string()))?
     {
         if let Some(filename) = field.file_name() {
             println!("filename: {}", filename)
@@ -82,11 +85,11 @@ async fn upload(
         let data = field
             .text()
             .await
-            .map_err(|e| UploadError::MultipartError(e.to_string()))?;
+            .map_err(|e| ServerError::MultipartError(e.to_string()))?;
 
         let ps = parse_service
             .write()
-            .map_err(|e| UploadError::ServiceError(e.to_string()))?;
+            .map_err(|e| ServerError::ServiceError(e.to_string()))?;
 
         let config = Config {
             name: "Amex".to_string(),
@@ -96,8 +99,23 @@ async fn upload(
         };
 
         ps.parse_data(config, data)
-            .map_err(|e| UploadError::ParseError(e.to_string()))?;
+            .map_err(|e| ServerError::ParseError(e.to_string()))?;
     }
 
     Ok(StatusCode::OK)
+}
+
+async fn get_transaction(
+    Path(id): Path<String>,
+    Extension(transaction_service): Extension<Arc<RwLock<TransactionService<Redis>>>>,
+) -> Result<StatusCode, ServerError> {
+    // not sure if we will need write here
+    let ts = transaction_service
+        .read()
+        .map_err(|e| ServerError::ServiceError(e.to_string()))?;
+
+    ts.find_transaction(&id)
+        .map_err(|e| ServerError::NoValue(e.to_string()))?;
+
+    return Ok(StatusCode::OK);
 }
