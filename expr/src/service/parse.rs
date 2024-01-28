@@ -15,10 +15,22 @@ pub struct Service {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ParsedTransaction {
-    account_type: String,
-    date: String,
-    amount: f64,
-    description: String,
+    pub account_type: String,
+    pub date: String,
+    pub amount: f64,
+    pub description: String,
+}
+
+impl ParsedTransaction {
+    // not the way that default should be used but it will help here
+    pub fn test() -> Self {
+        Self {
+            account_type: "test".to_string(),
+            date: "01/01/2024".to_string(),
+            amount: 123.45,
+            description: "A test record".to_string(),
+        }
+    }
 }
 
 impl Display for ParsedTransaction {

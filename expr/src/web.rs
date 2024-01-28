@@ -5,8 +5,9 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post},
-    Extension, Router,
+    Extension, Json, Router,
 };
+use serde_json::{json, Value};
 
 use crate::{
     database::redis::Redis,
@@ -34,6 +35,7 @@ impl Server {
             .route("/", get("Ok"))
             .route("/upload", post(upload))
             .route("/transactions/:id", get(get_transaction))
+            .route("/transactions", get(get_transactions))
             .layer(Extension(self.parse_service.clone()))
             .layer(Extension(self.transactions_service.clone()));
 
@@ -108,14 +110,42 @@ async fn upload(
 async fn get_transaction(
     Path(id): Path<String>,
     Extension(transaction_service): Extension<Arc<RwLock<TransactionService<Redis>>>>,
-) -> Result<StatusCode, ServerError> {
-    // not sure if we will need write here
+) -> Result<Json<Value>, ServerError> {
     let ts = transaction_service
         .read()
         .map_err(|e| ServerError::ServiceError(e.to_string()))?;
 
-    ts.find_transaction(&id)
+    let possible_transaction = ts
+        .find_transaction(&id)
         .map_err(|e| ServerError::NoValue(e.to_string()))?;
 
-    return Ok(StatusCode::OK);
+    match possible_transaction {
+        Some(t) => {
+            println!("Found transaction, {}", t);
+            return Ok(Json(json!(t)));
+        }
+        None => {
+            println!("Unable to find transaction for ID: {}", id);
+            return Err(ServerError::NoValue(format!(
+                "Unable to find transaction for ID: {}",
+                id
+            )));
+        }
+    };
+}
+
+async fn get_transactions(
+    Extension(transaction_service): Extension<Arc<RwLock<TransactionService<Redis>>>>,
+) -> Result<Json<Value>, ServerError> {
+    let ts = transaction_service
+        .read()
+        .map_err(|e| ServerError::ServiceError(e.to_string()))?;
+
+    let transactions = ts
+        .find_transactions()
+        .map_err(|e| ServerError::ServiceError(e.to_string()))?;
+
+    println!("Found {} transactions", transactions.len());
+
+    return Ok(Json(json!(transactions)));
 }

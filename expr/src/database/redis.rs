@@ -1,6 +1,6 @@
 use std::{error::Error, fmt::Display};
 
-use redis::{Commands, RedisResult};
+use redis::{Commands, FromRedisValue, RedisResult, Value};
 use serde::{Deserialize, Serialize};
 
 use super::base::{DatabaseError, DatabaseInit, DatabaseRead, DatabaseWrite};
@@ -56,7 +56,8 @@ impl DatabaseInit for Redis {
         Ok(())
     }
 
-    fn disconnect(&mut self) -> Result<(), Box<dyn Error>> {
+    fn disconnect(&mut self) -> Result<(), DatabaseError> {
+        // TODO: improve this disconnect function. Currently this is a memory leak
         self.connection = None;
         self.client = None;
         Ok(())
@@ -64,7 +65,7 @@ impl DatabaseInit for Redis {
 }
 
 impl DatabaseWrite for Redis {
-    fn save<T: ToString + Serialize>(&mut self, record: T) -> Result<(), DatabaseError> {
+    fn save<T: ToString + Serialize>(&mut self, record: T) -> Result<String, DatabaseError> {
         if self.connection.is_none() {
             self.connect()?;
             println!("Redis connection was None, attempting to connect");
@@ -73,11 +74,11 @@ impl DatabaseWrite for Redis {
         match self.connection.as_mut() {
             Some(c) => {
                 let uuid = create_new_uuid();
-                println!("Saving record with uuid: {}", uuid);
 
                 let json = serde_json::to_string(&record)
                     .map_err(|e| DatabaseError::JsonError(e.to_string()))?;
 
+                // potential issue is that the uuid is not part of the json object
                 redis::cmd("SET")
                     .arg(uuid.clone())
                     .arg(json)
@@ -91,7 +92,7 @@ impl DatabaseWrite for Redis {
                 // .query(c)
                 // .map_err(|e| DatabaseError::SaveError(e.to_string()))?;
 
-                println!("Record saved");
+                return Ok(uuid);
             }
             None => {
                 eprintln!("Redis connection was None");
@@ -100,27 +101,41 @@ impl DatabaseWrite for Redis {
                 ));
             }
         }
+    }
 
-        Ok(())
+    fn delete(&mut self, _id: &str) -> Result<bool, DatabaseError> {
+        todo!();
     }
 }
 
 impl DatabaseRead for Redis {
-    fn find<T: for<'a> Deserialize<'a>>(&mut self, id: &str) -> Result<T, DatabaseError> {
+    fn find<T: for<'a> Deserialize<'a>>(&mut self, id: &str) -> Result<Option<T>, DatabaseError> {
         if self.connection.is_none() {
             self.connect()?;
         }
 
         match self.connection.as_mut() {
             Some(c) => {
-                let res: String = c
+                let res: Value = c
                     .get(id)
                     .map_err(|e| DatabaseError::GetError(e.to_string()))?;
 
-                let json: T = serde_json::from_str(&res)
-                    .map_err(|e| DatabaseError::JsonError(e.to_string()))?;
+                match res {
+                    Value::Nil => return Ok(None),
+                    Value::Data(d) => {
+                        let data = String::from_utf8(d)
+                            .map_err(|e| DatabaseError::StringConversionError(e.to_string()))?;
 
-                return Ok(json);
+                        let json: T = serde_json::from_str(&data)
+                            .map_err(|e| DatabaseError::JsonError(e.to_string()))?;
+                        return Ok(Some(json));
+                    }
+                    _ => {
+                        return Err(DatabaseError::UnknownValueError(
+                            "Unknown value returned from redis".to_string(),
+                        ))
+                    }
+                }
             }
             None => {
                 return Err(DatabaseError::ConnectionError(
