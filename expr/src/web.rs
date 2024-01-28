@@ -4,7 +4,7 @@ use axum::{
     extract::{Multipart, Path},
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{delete, get, post},
     Extension, Json, Router,
 };
 use serde_json::{json, Value};
@@ -36,6 +36,7 @@ impl Server {
             .route("/upload", post(upload))
             .route("/transactions/:id", get(get_transaction))
             .route("/transactions", get(get_transactions))
+            .route("/transactions/:id", delete(delete_transaction))
             .layer(Extension(self.parse_service.clone()))
             .layer(Extension(self.transactions_service.clone()));
 
@@ -79,11 +80,6 @@ async fn upload(
         .await
         .map_err(|e| ServerError::MultipartError(e.to_string()))?
     {
-        if let Some(filename) = field.file_name() {
-            println!("filename: {}", filename)
-        }
-
-        // need to handle errors here and return responses to client
         let data = field
             .text()
             .await
@@ -121,7 +117,6 @@ async fn get_transaction(
 
     match possible_transaction {
         Some(t) => {
-            println!("Found transaction, {}", t);
             return Ok(Json(json!(t)));
         }
         None => {
@@ -145,7 +140,27 @@ async fn get_transactions(
         .find_transactions()
         .map_err(|e| ServerError::ServiceError(e.to_string()))?;
 
-    println!("Found {} transactions", transactions.len());
-
     return Ok(Json(json!(transactions)));
+}
+
+async fn delete_transaction(
+    Path(id): Path<String>,
+    Extension(transaction_service): Extension<Arc<RwLock<TransactionService<Redis>>>>,
+) -> Result<StatusCode, ServerError> {
+    let ts = transaction_service
+        .read()
+        .map_err(|e| ServerError::ServiceError(e.to_string()))?;
+
+    let has_deleted = ts
+        .delete_transaction(&id)
+        .map_err(|e| ServerError::ServiceError(e.to_string()))?;
+
+    if !has_deleted {
+        return Err(ServerError::ServiceError(format!(
+            "Failed to delete record with ID: {}",
+            id
+        )));
+    }
+
+    return Ok(StatusCode::OK);
 }

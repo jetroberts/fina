@@ -8,8 +8,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::database::base::{DatabaseInit, DatabaseRead, DatabaseWrite};
 
-use super::parse::ParsedTransaction;
-
 #[derive(Serialize, Deserialize)]
 pub struct Transaction {
     id: String,
@@ -18,6 +16,25 @@ pub struct Transaction {
     amount: f64,
     description: String,
     created_at: String,
+    category: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateTransaction {
+    pub account_type: String,
+    pub date: String,
+    pub amount: f64,
+    pub description: String,
+}
+
+impl Display for CreateTransaction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "account_type: {}, date: {}, amount: {}",
+            self.account_type, self.date, self.amount
+        )
+    }
 }
 
 impl Display for Transaction {
@@ -30,8 +47,10 @@ impl Display for Transaction {
     }
 }
 
-impl From<ParsedTransaction> for Transaction {
-    fn from(parsed_transaction: ParsedTransaction) -> Self {
+impl From<CreateTransaction> for Transaction {
+    fn from(parsed_transaction: CreateTransaction) -> Self {
+        // massive question mark around whether to create the id here...
+        // might be a better idea to have a create / update / saved version of a Transaction
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             account_type: parsed_transaction.account_type,
@@ -39,6 +58,7 @@ impl From<ParsedTransaction> for Transaction {
             amount: parsed_transaction.amount,
             description: parsed_transaction.description,
             created_at: chrono::Utc::now().to_string(),
+            category: None,
         }
     }
 }
@@ -47,6 +67,7 @@ pub enum TransactionError {
     DatabaseConnectionError(String),
     SaveError(String),
     FindError(String),
+    DeleteError(String),
 }
 
 impl Display for TransactionError {
@@ -60,6 +81,9 @@ impl Display for TransactionError {
             }
             TransactionError::SaveError(e) => {
                 write!(f, "TransactionError -> SaveError, {}", e)
+            }
+            TransactionError::DeleteError(e) => {
+                write!(f, "TransactionError -> DeleteError, {}", e)
             }
         }
     }
@@ -83,14 +107,14 @@ where
 
     pub fn save_transaction(
         &self,
-        new_transaction: ParsedTransaction,
+        create_transaction: CreateTransaction,
     ) -> Result<(), TransactionError> {
         let mut db_connection = self
             .db
             .lock()
             .map_err(|e| TransactionError::DatabaseConnectionError(e.to_string()))?;
 
-        let t: Transaction = Transaction::from(new_transaction);
+        let t: Transaction = Transaction::from(create_transaction);
 
         db_connection
             .save::<Transaction>(t)
@@ -120,9 +144,22 @@ where
 
         let transactions: Vec<Transaction> = db_connection
             .find_all()
-            .map_err(|e| TransactionError::DatabaseConnectionError(e.to_string()))?;
+            .map_err(|e| TransactionError::FindError(e.to_string()))?;
 
         return Ok(transactions);
+    }
+
+    pub fn delete_transaction(&self, id: &str) -> Result<bool, TransactionError> {
+        let mut db_connection = self
+            .db
+            .lock()
+            .map_err(|e| TransactionError::DatabaseConnectionError(e.to_string()))?;
+
+        let has_deleted = db_connection
+            .delete(id)
+            .map_err(|e| TransactionError::DeleteError(e.to_string()))?;
+
+        return Ok(has_deleted);
     }
     // there will need to be something to do with categorising the transactions
 }

@@ -7,6 +7,7 @@ pub enum DatabaseError {
     ClientError(String),
     SaveError(String),
     GetError(String),
+    DeleteError(String),
     JsonError(String),
     StringConversionError(String),
     UnknownValueError(String),
@@ -21,6 +22,7 @@ impl Display for DatabaseError {
             DatabaseError::ClientError(e) => write!(f, "DatabaseError -> ClientError, {}", e),
             DatabaseError::SaveError(e) => write!(f, "DatabaseError -> SaveError, {}", e),
             DatabaseError::GetError(e) => write!(f, "DatabaseError -> GetError, {}", e),
+            DatabaseError::DeleteError(e) => write!(f, "DatabaseError -> DeleteError, {}", e),
             DatabaseError::JsonError(e) => write!(f, "DatabaseError -> JsonError, {}", e),
             DatabaseError::StringConversionError(e) => {
                 write!(f, "DatabaseError -> StringConversionError, {}", e)
@@ -45,6 +47,7 @@ pub trait DatabaseWrite {
     // do I want to split save into create and update? For nosql it's not an issue for sql it
     // probably will be
     fn save<T: ToString + Serialize>(&mut self, record: T) -> Result<String, DatabaseError>;
+    // may want to implement a soft delete
     fn delete(&mut self, id: &str) -> Result<bool, DatabaseError>;
 }
 

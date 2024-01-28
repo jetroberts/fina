@@ -103,8 +103,27 @@ impl DatabaseWrite for Redis {
         }
     }
 
-    fn delete(&mut self, _id: &str) -> Result<bool, DatabaseError> {
-        todo!();
+    fn delete(&mut self, id: &str) -> Result<bool, DatabaseError> {
+        if self.connection.is_none() {
+            self.connect()?;
+        }
+
+        match self.connection.as_mut() {
+            Some(conn) => {
+                let _ = redis::cmd("DEL")
+                    .arg(id)
+                    .query::<()>(conn)
+                    .map_err(|e| DatabaseError::DeleteError(e.to_string()))?;
+
+                return Ok(true);
+            }
+            None => {
+                eprintln!("Redis connection was None");
+                return Err(DatabaseError::SaveError(
+                    "Redis connection was None".to_string(),
+                ));
+            }
+        }
     }
 }
 
@@ -157,8 +176,6 @@ impl DatabaseRead for Redis {
                     .arg("*")
                     .query(conn)
                     .map_err(|e| DatabaseError::GetError(e.to_string()))?;
-
-                println!("keys {:?}", keys_values);
 
                 // might need to refactor this into something simpler
                 let keys: Vec<Option<String>> = match keys_values {
