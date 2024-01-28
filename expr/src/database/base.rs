@@ -50,5 +50,5 @@ pub trait DatabaseWrite {
 
 pub trait DatabaseRead {
     fn find<T: for<'a> Deserialize<'a>>(&mut self, id: &str) -> Result<Option<T>, DatabaseError>;
-    fn find_all<T>(&mut self) -> Result<Vec<T>, DatabaseError>;
+    fn find_all<T: for<'a> Deserialize<'a>>(&mut self) -> Result<Vec<T>, DatabaseError>;
 }

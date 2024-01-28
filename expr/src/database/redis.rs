@@ -1,6 +1,6 @@
 use std::{error::Error, fmt::Display};
 
-use redis::{Commands, FromRedisValue, RedisResult, Value};
+use redis::{Commands, Value};
 use serde::{Deserialize, Serialize};
 
 use super::base::{DatabaseError, DatabaseInit, DatabaseRead, DatabaseWrite};
@@ -145,7 +145,75 @@ impl DatabaseRead for Redis {
         }
     }
 
-    fn find_all<T>(&mut self) -> Result<Vec<T>, DatabaseError> {
+    fn find_all<T: for<'a> Deserialize<'a>>(&mut self) -> Result<Vec<T>, DatabaseError> {
+        if self.connection.is_none() {
+            self.connect()?;
+        }
+
+        match self.connection.as_mut() {
+            Some(conn) => {
+                // this is going to be terrible for performance but prototypes eh
+                let keys_values: Value = redis::cmd("KEYS")
+                    .arg("*")
+                    .query(conn)
+                    .map_err(|e| DatabaseError::GetError(e.to_string()))?;
+
+                println!("keys {:?}", keys_values);
+
+                // might need to refactor this into something simpler
+                let keys: Vec<Option<String>> = match keys_values {
+                    Value::Nil => Vec::new(),
+                    Value::Bulk(keys) => keys
+                        .into_iter()
+                        .map(|k| match k {
+                            Value::Data(d) => {
+                                return match String::from_utf8(d) {
+                                    Ok(res) => Some(res),
+                                    Err(e) => {
+                                        eprintln!("Unable to convert redis key to string, {}", e);
+                                        return None;
+                                    }
+                                };
+                            }
+                            _ => None,
+                        })
+                        .collect(),
+                    _ => {
+                        return Err(DatabaseError::UnknownValueError(
+                            "Unknown value returned from redis".to_string(),
+                        ));
+                    }
+                };
+
+                if keys.is_empty() {
+                    return Ok(Vec::new());
+                }
+
+                let mut entries: Vec<T> = Vec::new();
+
+                keys.iter().for_each(|k| match k {
+                    Some(k) => {
+                        match self.find::<T>(k) {
+                            Ok(entry) => {
+                                if let Some(e) = entry {
+                                    entries.push(e)
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("Unable to find entry {}, {}", k, e);
+                            }
+                        };
+                    }
+                    None => {}
+                });
+            }
+            None => {
+                return Err(DatabaseError::ConnectionError(
+                    "No connection found whilst trying to find all records".to_string(),
+                ))
+            }
+        }
+
         return Ok(Vec::new());
     }
 }
