@@ -206,6 +206,8 @@ impl DatabaseRead for Redis {
                     }
                     None => {}
                 });
+
+                return Ok(entries);
             }
             None => {
                 return Err(DatabaseError::ConnectionError(
@@ -213,8 +215,6 @@ impl DatabaseRead for Redis {
                 ))
             }
         }
-
-        return Ok(Vec::new());
     }
 }
 
