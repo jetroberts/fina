@@ -20,7 +20,7 @@ impl TextFile {
 }
 
 impl DatabaseInit for TextFile {
-    fn connect(&mut self) -> Result<(), DatabaseError> {
+    async fn connect(&mut self) -> Result<(), DatabaseError> {
         let new_file = File::create(self.filename)
             .map_err(|e| DatabaseError::ConnectionError(e.to_string()))?;
 
@@ -29,7 +29,7 @@ impl DatabaseInit for TextFile {
         return Ok(());
     }
 
-    fn disconnect(&mut self) -> Result<(), DatabaseError> {
+    async fn disconnect(&mut self) -> Result<(), DatabaseError> {
         self.file = None;
         remove_file(self.filename).map_err(|e| DatabaseError::ConnectionError(e.to_string()))?;
         Ok(())
@@ -37,7 +37,7 @@ impl DatabaseInit for TextFile {
 }
 
 impl DatabaseRead for TextFile {
-    fn find<T: for<'a> serde::Deserialize<'a>>(
+    async fn find<T: for<'a> serde::Deserialize<'a>>(
         &mut self,
         id: &str,
     ) -> Result<Option<T>, DatabaseError> {
@@ -45,15 +45,18 @@ impl DatabaseRead for TextFile {
         todo!()
     }
 
-    fn find_all<T>(&mut self) -> Result<Vec<T>, DatabaseError> {
+    async fn find_all<T>(&mut self) -> Result<Vec<T>, DatabaseError> {
         todo!()
     }
 }
 
 impl DatabaseWrite for TextFile {
-    fn save<T: ToString + serde::Serialize>(&mut self, record: T) -> Result<String, DatabaseError> {
+    async fn save<T: ToString + serde::Serialize>(
+        &mut self,
+        record: T,
+    ) -> Result<String, DatabaseError> {
         if self.file.is_none() {
-            self.connect()?;
+            self.connect().await?;
         }
 
         match &mut self.file {
@@ -74,7 +77,7 @@ impl DatabaseWrite for TextFile {
         }
     }
 
-    fn delete(&mut self, id: &str) -> Result<bool, DatabaseError> {
+    async fn delete(&mut self, id: &str) -> Result<bool, DatabaseError> {
         println!("{}", id);
         todo!()
     }

@@ -1,6 +1,7 @@
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use axum::{
+    debug_handler,
     extract::{Multipart, Path},
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -8,6 +9,7 @@ use axum::{
     Extension, Json, Router,
 };
 use serde_json::{json, Value};
+use tokio::sync::RwLock;
 
 use crate::{
     database::redis::Redis,
@@ -85,9 +87,7 @@ async fn upload(
             .await
             .map_err(|e| ServerError::MultipartError(e.to_string()))?;
 
-        let ps = parse_service
-            .write()
-            .map_err(|e| ServerError::ServiceError(e.to_string()))?;
+        let ps = parse_service.write().await;
 
         let config = Config {
             name: "Amex".to_string(),
@@ -97,6 +97,7 @@ async fn upload(
         };
 
         ps.parse_data(config, data)
+            .await
             .map_err(|e| ServerError::ParseError(e.to_string()))?;
     }
 
@@ -107,12 +108,11 @@ async fn get_transaction(
     Path(id): Path<String>,
     Extension(transaction_service): Extension<Arc<RwLock<TransactionService<Redis>>>>,
 ) -> Result<Json<Value>, ServerError> {
-    let ts = transaction_service
-        .read()
-        .map_err(|e| ServerError::ServiceError(e.to_string()))?;
+    let ts = transaction_service.read().await;
 
     let possible_transaction = ts
         .find_transaction(&id)
+        .await
         .map_err(|e| ServerError::NoValue(e.to_string()))?;
 
     match possible_transaction {
@@ -132,12 +132,11 @@ async fn get_transaction(
 async fn get_transactions(
     Extension(transaction_service): Extension<Arc<RwLock<TransactionService<Redis>>>>,
 ) -> Result<Json<Value>, ServerError> {
-    let ts = transaction_service
-        .read()
-        .map_err(|e| ServerError::ServiceError(e.to_string()))?;
+    let ts = transaction_service.read().await;
 
     let transactions = ts
         .find_transactions()
+        .await
         .map_err(|e| ServerError::ServiceError(e.to_string()))?;
 
     return Ok(Json(json!(transactions)));
@@ -147,12 +146,11 @@ async fn delete_transaction(
     Path(id): Path<String>,
     Extension(transaction_service): Extension<Arc<RwLock<TransactionService<Redis>>>>,
 ) -> Result<StatusCode, ServerError> {
-    let ts = transaction_service
-        .read()
-        .map_err(|e| ServerError::ServiceError(e.to_string()))?;
+    let ts = transaction_service.read().await;
 
     let has_deleted = ts
         .delete_transaction(&id)
+        .await
         .map_err(|e| ServerError::ServiceError(e.to_string()))?;
 
     if !has_deleted {

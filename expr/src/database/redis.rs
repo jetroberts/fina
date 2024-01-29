@@ -1,13 +1,14 @@
-use std::{error::Error, fmt::Display};
+use std::{error::Error, fmt::Display, sync::Arc};
 
 use redis::{Commands, Value};
 use serde::{Deserialize, Serialize};
+use tokio::{sync::RwLock, task::JoinHandle};
 
 use super::base::{DatabaseError, DatabaseInit, DatabaseRead, DatabaseWrite};
 
 pub struct Redis {
-    client: Option<redis::Client>,
-    connection: Option<redis::Connection>,
+    client: Option<Arc<RwLock<redis::Client>>>,
+    connection: Option<Arc<RwLock<redis::Connection>>>,
 }
 
 impl Redis {
@@ -42,7 +43,7 @@ impl Display for RedisConnectionError {
 }
 
 impl DatabaseInit for Redis {
-    fn connect(&mut self) -> Result<(), DatabaseError> {
+    async fn connect(&mut self) -> Result<(), DatabaseError> {
         let client = redis::Client::open("redis://redis/")
             .map_err(|e| DatabaseError::ClientError(e.to_string()))?;
 
@@ -50,13 +51,13 @@ impl DatabaseInit for Redis {
             .get_connection()
             .map_err(|e| DatabaseError::ConnectionError(e.to_string()))?;
 
-        self.client = Some(client);
-        self.connection = Some(conn);
+        self.client = Some(Arc::new(RwLock::new(client)));
+        self.connection = Some(Arc::new(RwLock::new(conn)));
 
         Ok(())
     }
 
-    fn disconnect(&mut self) -> Result<(), DatabaseError> {
+    async fn disconnect(&mut self) -> Result<(), DatabaseError> {
         // TODO: improve this disconnect function. Currently this is a memory leak
         self.connection = None;
         self.client = None;
@@ -65,14 +66,15 @@ impl DatabaseInit for Redis {
 }
 
 impl DatabaseWrite for Redis {
-    fn save<T: ToString + Serialize>(&mut self, record: T) -> Result<String, DatabaseError> {
+    async fn save<T: ToString + Serialize>(&mut self, record: T) -> Result<String, DatabaseError> {
         if self.connection.is_none() {
-            self.connect()?;
+            self.connect().await?;
             println!("Redis connection was None, attempting to connect");
         }
 
         match self.connection.as_mut() {
             Some(c) => {
+                let mut c = c.write().await;
                 let uuid = create_new_uuid();
 
                 let json = serde_json::to_string(&record)
@@ -82,7 +84,7 @@ impl DatabaseWrite for Redis {
                 redis::cmd("SET")
                     .arg(uuid.clone())
                     .arg(json)
-                    .query(c)
+                    .query(&mut c)
                     .map_err(|e| DatabaseError::SaveError(e.to_string()))?;
 
                 // need to figure out a good secondary index for searching by a subset of records
@@ -103,16 +105,17 @@ impl DatabaseWrite for Redis {
         }
     }
 
-    fn delete(&mut self, id: &str) -> Result<bool, DatabaseError> {
+    async fn delete(&mut self, id: &str) -> Result<bool, DatabaseError> {
         if self.connection.is_none() {
-            self.connect()?;
+            self.connect().await?;
         }
 
         match self.connection.as_mut() {
             Some(conn) => {
+                let mut c = conn.write().await;
                 let _ = redis::cmd("DEL")
                     .arg(id)
-                    .query::<()>(conn)
+                    .query::<()>(&mut c)
                     .map_err(|e| DatabaseError::DeleteError(e.to_string()))?;
 
                 return Ok(true);
@@ -128,13 +131,17 @@ impl DatabaseWrite for Redis {
 }
 
 impl DatabaseRead for Redis {
-    fn find<T: for<'a> Deserialize<'a>>(&mut self, id: &str) -> Result<Option<T>, DatabaseError> {
+    async fn find<T: for<'a> Deserialize<'a>>(
+        &mut self,
+        id: &str,
+    ) -> Result<Option<T>, DatabaseError> {
         if self.connection.is_none() {
-            self.connect()?;
+            self.connect().await?;
         }
 
         match self.connection.as_mut() {
             Some(c) => {
+                let mut c = c.write().await;
                 let res: Value = c
                     .get(id)
                     .map_err(|e| DatabaseError::GetError(e.to_string()))?;
@@ -164,17 +171,20 @@ impl DatabaseRead for Redis {
         }
     }
 
-    fn find_all<T: for<'a> Deserialize<'a>>(&mut self) -> Result<Vec<T>, DatabaseError> {
+    async fn find_all<T: for<'a> Deserialize<'a> + Send>(
+        &mut self,
+    ) -> Result<Vec<T>, DatabaseError> {
         if self.connection.is_none() {
-            self.connect()?;
+            self.connect().await?;
         }
 
-        match self.connection.as_mut() {
+        let keys: Vec<Option<String>> = match self.connection.as_mut() {
             Some(conn) => {
                 // this is going to be terrible for performance but prototypes eh
+                let mut c = conn.write().await;
                 let keys_values: Value = redis::cmd("KEYS")
                     .arg("*")
-                    .query(conn)
+                    .query(&mut c)
                     .map_err(|e| DatabaseError::GetError(e.to_string()))?;
 
                 // might need to refactor this into something simpler
@@ -183,55 +193,49 @@ impl DatabaseRead for Redis {
                     Value::Bulk(keys) => keys
                         .into_iter()
                         .map(|k| match k {
-                            Value::Data(d) => {
-                                return match String::from_utf8(d) {
-                                    Ok(res) => Some(res),
-                                    Err(e) => {
-                                        eprintln!("Unable to convert redis key to string, {}", e);
-                                        return None;
-                                    }
-                                };
-                            }
+                            Value::Data(d) => match String::from_utf8(d) {
+                                Ok(res) => Some(res),
+                                Err(e) => {
+                                    eprintln!("Unable to convert redis key to string, {}", e);
+                                    return None;
+                                }
+                            },
                             _ => None,
                         })
                         .collect(),
-                    _ => {
-                        return Err(DatabaseError::UnknownValueError(
-                            "Unknown value returned from redis".to_string(),
-                        ));
-                    }
+                    _ => Vec::new(),
                 };
 
                 if keys.is_empty() {
                     return Ok(Vec::new());
                 }
 
-                let mut entries: Vec<T> = Vec::new();
-
-                keys.iter().for_each(|k| match k {
-                    Some(k) => {
-                        match self.find::<T>(k) {
-                            Ok(entry) => {
-                                if let Some(e) = entry {
-                                    entries.push(e)
-                                }
-                            }
-                            Err(e) => {
-                                eprintln!("Unable to find entry {}, {}", k, e);
-                            }
-                        };
-                    }
-                    None => {}
-                });
-
-                return Ok(entries);
+                Ok(keys)
             }
-            None => {
-                return Err(DatabaseError::ConnectionError(
-                    "No connection found whilst trying to find all records".to_string(),
-                ))
-            }
+            None => Err(DatabaseError::ConnectionError(
+                "No connection found whilst trying to find all records".to_string(),
+            )),
+        }?;
+
+        let entries: Vec<T> = Vec::new();
+
+        let tasks: Vec<JoinHandle<_>> = keys
+            .into_iter()
+            .map(|key| {
+                tokio::spawn(async move {
+                    match key {
+                        Some(k) => Some(self.find::<T>(&k).await),
+                        None => None,
+                    };
+                })
+            })
+            .collect();
+
+        for task in tasks {
+            task.await;
         }
+
+        return Ok(entries);
     }
 }
 

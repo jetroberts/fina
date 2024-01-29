@@ -1,10 +1,7 @@
 use core::fmt;
-use std::{
-    fmt::Display,
-    sync::{Arc, Mutex},
-};
-
 use serde::{Deserialize, Serialize};
+use std::{fmt::Display, sync::Arc};
+use tokio::sync::RwLock;
 
 use crate::database::base::{DatabaseInit, DatabaseRead, DatabaseWrite};
 
@@ -93,7 +90,7 @@ pub struct TransactionService<T>
 where
     for<'a> T: DatabaseInit + DatabaseWrite + DatabaseRead,
 {
-    db: Arc<Mutex<T>>,
+    db: Arc<RwLock<T>>,
 }
 
 impl<T> TransactionService<T>
@@ -101,62 +98,57 @@ where
     for<'a> T: DatabaseInit + DatabaseWrite + DatabaseRead,
 {
     pub fn new(db: T) -> TransactionService<T> {
-        let db = Arc::new(Mutex::new(db));
+        let db = Arc::new(RwLock::new(db));
         Self { db }
     }
 
-    pub fn save_transaction(
+    pub async fn save_transaction(
         &self,
         create_transaction: CreateTransaction,
     ) -> Result<(), TransactionError> {
-        let mut db_connection = self
-            .db
-            .lock()
-            .map_err(|e| TransactionError::DatabaseConnectionError(e.to_string()))?;
+        let mut db_connection = self.db.write().await;
 
         let t: Transaction = Transaction::from(create_transaction);
 
         db_connection
             .save::<Transaction>(t)
+            .await
             .map_err(|e| TransactionError::SaveError(e.to_string()))?;
 
         Ok(())
     }
 
-    pub fn find_transaction(&self, id: &str) -> Result<Option<Transaction>, TransactionError> {
-        let mut db_connection = self
-            .db
-            .lock()
-            .map_err(|e| TransactionError::DatabaseConnectionError(e.to_string()))?;
+    pub async fn find_transaction(
+        &self,
+        id: &str,
+    ) -> Result<Option<Transaction>, TransactionError> {
+        let mut db_connection = self.db.write().await;
 
         let transaction: Option<Transaction> = db_connection
             .find(id)
+            .await
             .map_err(|e| TransactionError::FindError(e.to_string()))?;
 
         return Ok(transaction);
     }
 
-    pub fn find_transactions(&self) -> Result<Vec<Transaction>, TransactionError> {
-        let mut db_connection = self
-            .db
-            .lock()
-            .map_err(|e| TransactionError::DatabaseConnectionError(e.to_string()))?;
+    pub async fn find_transactions(&self) -> Result<Vec<Transaction>, TransactionError> {
+        let mut db_connection = self.db.write().await;
 
         let transactions: Vec<Transaction> = db_connection
             .find_all()
+            .await
             .map_err(|e| TransactionError::FindError(e.to_string()))?;
 
         return Ok(transactions);
     }
 
-    pub fn delete_transaction(&self, id: &str) -> Result<bool, TransactionError> {
-        let mut db_connection = self
-            .db
-            .lock()
-            .map_err(|e| TransactionError::DatabaseConnectionError(e.to_string()))?;
+    pub async fn delete_transaction(&self, id: &str) -> Result<bool, TransactionError> {
+        let mut db_connection = self.db.write().await;
 
         let has_deleted = db_connection
             .delete(id)
+            .await
             .map_err(|e| TransactionError::DeleteError(e.to_string()))?;
 
         return Ok(has_deleted);

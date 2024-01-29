@@ -1,7 +1,9 @@
 use std::{
     fmt::{self, Display},
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
+
+use tokio::sync::RwLock;
 
 use crate::database::redis::Redis;
 
@@ -45,12 +47,13 @@ impl Service {
         }
     }
 
-    pub fn parse_data(&self, extraction_config: Config, data: String) -> Result<(), ParseError> {
+    pub async fn parse_data(
+        &self,
+        extraction_config: Config,
+        data: String,
+    ) -> Result<(), ParseError> {
         let mut csv_reader = csv::Reader::from_reader(data.as_bytes());
-        let transaction_service = self
-            .transaction_service
-            .write()
-            .map_err(|e| ParseError::RwLockError(e.to_string()))?;
+        let transaction_service = self.transaction_service.write().await;
 
         for record in csv_reader.records() {
             let r = record.map_err(|e| ParseError::RecordError(e.to_string()))?;
@@ -72,6 +75,7 @@ impl Service {
 
             transaction_service
                 .save_transaction(new_transaction)
+                .await
                 .map_err(|e| ParseError::SaveError(e.to_string()))?;
         }
 
