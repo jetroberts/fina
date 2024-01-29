@@ -219,22 +219,6 @@ impl DatabaseRead for Redis {
 
         let entries: Vec<T> = Vec::new();
 
-        let tasks: Vec<JoinHandle<_>> = keys
-            .into_iter()
-            .map(|key| {
-                tokio::spawn(async move {
-                    match key {
-                        Some(k) => Some(self.find::<T>(&k).await),
-                        None => None,
-                    };
-                })
-            })
-            .collect();
-
-        for task in tasks {
-            task.await;
-        }
-
         return Ok(entries);
     }
 }
