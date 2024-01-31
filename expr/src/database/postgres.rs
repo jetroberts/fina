@@ -54,7 +54,19 @@ impl DatabaseWrite for Postgres {
         &mut self,
         record: T,
     ) -> Result<String, DatabaseError> {
-        todo!()
+        if self.pool.is_some() {
+            self.connect().await?;
+        }
+
+        let rows = sqlx::query!(
+            r#"
+                INSERT INTO transactions (, )
+                VALUES ($1, $2)
+                RETURNING id 
+        "#
+        );
+
+        return Ok("".to_string());
     }
 
     async fn delete(&mut self, id: &str) -> Result<bool, DatabaseError> {

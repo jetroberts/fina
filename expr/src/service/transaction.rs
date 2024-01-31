@@ -9,19 +9,21 @@ use crate::database::base::{DatabaseInit, DatabaseRead, DatabaseWrite};
 pub struct Transaction {
     id: String,
     account_type: String,
-    date: String,
+    payment_date: String,
     amount: f64,
     description: String,
-    created_at: String,
     category: Option<String>,
+    created_at: String,
+    updated_at: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTransaction {
     pub account_type: String,
-    pub date: String,
+    pub payment_date: String,
     pub amount: f64,
     pub description: String,
+    pub category: Option<String>,
 }
 
 impl Display for CreateTransaction {
@@ -29,7 +31,7 @@ impl Display for CreateTransaction {
         write!(
             f,
             "account_type: {}, date: {}, amount: {}",
-            self.account_type, self.date, self.amount
+            self.account_type, self.payment_date, self.amount
         )
     }
 }
@@ -39,29 +41,12 @@ impl Display for Transaction {
         write!(
             f,
             "Id: {}\n, Type: {}\nDate: {}\nAmount: {}\nDescription: {}",
-            self.id, self.account_type, self.date, self.amount, self.description
+            self.id, self.account_type, self.payment_date, self.amount, self.description
         )
     }
 }
 
-impl From<CreateTransaction> for Transaction {
-    fn from(parsed_transaction: CreateTransaction) -> Self {
-        // massive question mark around whether to create the id here...
-        // might be a better idea to have a create / update / saved version of a Transaction
-        Self {
-            id: uuid::Uuid::new_v4().to_string(),
-            account_type: parsed_transaction.account_type,
-            date: parsed_transaction.date,
-            amount: parsed_transaction.amount,
-            description: parsed_transaction.description,
-            created_at: chrono::Utc::now().to_string(),
-            category: None,
-        }
-    }
-}
-
 pub enum TransactionError {
-    DatabaseConnectionError(String),
     SaveError(String),
     FindError(String),
     DeleteError(String),
@@ -70,9 +55,6 @@ pub enum TransactionError {
 impl Display for TransactionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TransactionError::DatabaseConnectionError(e) => {
-                write!(f, "TransactionError -> DatabaseError, {}", e)
-            }
             TransactionError::FindError(e) => {
                 write!(f, "TransactionError -> FindError, {}", e)
             }
@@ -108,10 +90,8 @@ where
     ) -> Result<(), TransactionError> {
         let mut db_connection = self.db.write().await;
 
-        let t: Transaction = Transaction::from(create_transaction);
-
         db_connection
-            .save::<Transaction>(t)
+            .save::<CreateTransaction>(create_transaction)
             .await
             .map_err(|e| TransactionError::SaveError(e.to_string()))?;
 
