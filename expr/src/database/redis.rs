@@ -217,7 +217,40 @@ impl DatabaseRead for Redis {
             )),
         }?;
 
-        let entries: Vec<T> = Vec::new();
+        let mut entries: Vec<T> = Vec::new();
+
+        match self.connection.as_mut() {
+            Some(conn) => {
+                let mut c = conn.write().await;
+
+                for key in keys {
+                    if let Some(k) = key {
+                        let res: Value = c
+                            .get(k)
+                            .map_err(|e| DatabaseError::GetError(e.to_string()))?;
+
+                        match res {
+                            Value::Nil => continue,
+                            Value::Data(d) => {
+                                let data = String::from_utf8(d).map_err(|e| {
+                                    DatabaseError::StringConversionError(e.to_string())
+                                })?;
+
+                                let json: T = serde_json::from_str(&data)
+                                    .map_err(|e| DatabaseError::JsonError(e.to_string()))?;
+                                entries.push(json);
+                            }
+                            _ => {
+                                return Err(DatabaseError::UnknownValueError(
+                                    "Unknown value returned from redis".to_string(),
+                                ))
+                            }
+                        }
+                    }
+                }
+            }
+            None => (),
+        }
 
         return Ok(entries);
     }

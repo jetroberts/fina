@@ -6,3 +6,5 @@ TODO
 **/tmp
 
 .DS_Store
+
+db_password.txt
