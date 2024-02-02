@@ -2,9 +2,9 @@ use std::{error::Error, fmt::Display, sync::Arc};
 
 use redis::{Commands, Value};
 use serde::{Deserialize, Serialize};
-use tokio::{sync::RwLock, task::JoinHandle};
+use tokio::sync::RwLock;
 
-use super::base::{DatabaseError, DatabaseInit, DatabaseRead, DatabaseWrite};
+use super::base::{DatabaseError, DatabaseInit, DatabaseRead, DatabaseWrite, TransactionWrite};
 
 pub struct Redis {
     client: Option<Arc<RwLock<redis::Client>>>,
@@ -253,6 +253,15 @@ impl DatabaseRead for Redis {
         }
 
         return Ok(entries);
+    }
+}
+
+impl TransactionWrite for Redis {
+    async fn create_transaction(
+        self,
+        create_transaction: crate::service::transaction::CreateTransaction,
+    ) -> Result<(), DatabaseError> {
+        todo!()
     }
 }
 

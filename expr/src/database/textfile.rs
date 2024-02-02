@@ -3,7 +3,7 @@ use std::{
     io::Write,
 };
 
-use super::base::{DatabaseError, DatabaseInit, DatabaseRead, DatabaseWrite};
+use super::base::{DatabaseError, DatabaseInit, DatabaseRead, DatabaseWrite, TransactionWrite};
 
 pub struct TextFile {
     filename: &'static str,
@@ -79,6 +79,15 @@ impl DatabaseWrite for TextFile {
 
     async fn delete(&mut self, id: &str) -> Result<bool, DatabaseError> {
         println!("{}", id);
+        todo!()
+    }
+}
+
+impl TransactionWrite for TextFile {
+    async fn create_transaction(
+        self,
+        create_transaction: crate::service::transaction::CreateTransaction,
+    ) -> Result<(), DatabaseError> {
         todo!()
     }
 }

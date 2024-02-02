@@ -1,3 +1,5 @@
+use chrono::NaiveDateTime;
+
 use crate::{
     database::textfile::TextFile,
     service::transaction::{CreateTransaction, TransactionService},
@@ -15,13 +17,12 @@ impl Cli {
     }
 
     pub fn start(self) {
-        let new_transaction = CreateTransaction {
+        let _new_transaction = CreateTransaction {
             account_type: format!("Amex"),
-            date: format!("01/01/2022"),
+            payment_date: NaiveDateTime::parse_from_str("2021-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
+                .unwrap(),
             amount: 12.34,
             description: format!("TEST"),
         };
-
-        let _ = self.transaction_service.save_transaction(new_transaction);
     }
 }

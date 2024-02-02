@@ -2,6 +2,8 @@ use std::fmt::{self, Display};
 
 use serde::{Deserialize, Serialize};
 
+use crate::service::transaction::CreateTransaction;
+
 pub enum DatabaseError {
     ConnectionError(String),
     ClientError(String),
@@ -59,4 +61,15 @@ pub trait DatabaseRead {
     async fn find_all<T: for<'a> Deserialize<'a> + Send>(
         &mut self,
     ) -> Result<Vec<T>, DatabaseError>;
+}
+
+pub trait TransactionWrite {
+    async fn create_transaction(
+        self,
+        create_transaction: CreateTransaction,
+    ) -> Result<(), DatabaseError>;
+}
+
+pub trait TransactionRead {
+    async fn get_transaction(self, id: &str) -> Result<Option<CreateTransaction>, DatabaseError>;
 }

@@ -3,6 +3,7 @@ use std::{
     sync::Arc,
 };
 
+use chrono::NaiveDateTime;
 use tokio::sync::RwLock;
 
 use crate::database::redis::Redis;
@@ -69,12 +70,13 @@ impl Service {
             let new_transaction = CreateTransaction {
                 account_type: extraction_config.name.clone(),
                 amount,
-                date: date.to_string(),
+                payment_date: NaiveDateTime::parse_from_str(date, "%Y/%m/%d")
+                    .map_err(|e| ParseError::SaveError(e.to_string()))?,
                 description: description.to_string(),
             };
 
             transaction_service
-                .save_transaction(new_transaction)
+                .create_transaction(new_transaction)
                 .await
                 .map_err(|e| ParseError::SaveError(e.to_string()))?;
         }

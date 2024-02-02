@@ -1,29 +1,28 @@
+use chrono::{DateTime, NaiveDateTime, Utc};
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, sync::Arc};
 use tokio::sync::RwLock;
 
-use crate::database::base::{DatabaseInit, DatabaseRead, DatabaseWrite};
+use crate::database::base::{DatabaseInit, DatabaseRead, DatabaseWrite, TransactionWrite};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Transaction {
-    id: String,
-    account_type: String,
-    payment_date: String,
-    amount: f64,
-    description: String,
-    category: Option<String>,
-    created_at: String,
-    updated_at: String,
+    pub id: String,
+    pub account_type: String,
+    pub payment_date: NaiveDateTime,
+    pub amount: f64,
+    pub description: String,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTransaction {
     pub account_type: String,
-    pub payment_date: String,
+    pub payment_date: NaiveDateTime,
     pub amount: f64,
     pub description: String,
-    pub category: Option<String>,
 }
 
 impl Display for CreateTransaction {
@@ -77,14 +76,28 @@ where
 
 impl<T> TransactionService<T>
 where
-    for<'a> T: DatabaseInit + DatabaseWrite + DatabaseRead,
+    for<'a> T: DatabaseInit + DatabaseWrite + DatabaseRead + TransactionWrite,
 {
     pub fn new(db: T) -> TransactionService<T> {
         let db = Arc::new(RwLock::new(db));
         Self { db }
     }
 
-    pub async fn save_transaction(
+    pub async fn create_transaction(
+        &self,
+        create_transaction: CreateTransaction,
+    ) -> Result<(), TransactionError> {
+        let mut db_connection = self.db.write().await;
+
+        db_connection
+            .save::<CreateTransaction>(create_transaction)
+            .await
+            .map_err(|e| TransactionError::SaveError(e.to_string()))?;
+
+        Ok(())
+    }
+
+    pub async fn update_transaction(
         &self,
         create_transaction: CreateTransaction,
     ) -> Result<(), TransactionError> {

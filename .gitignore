@@ -7,4 +7,5 @@ TODO
 
 .DS_Store
 
+.env
 db_password.txt
