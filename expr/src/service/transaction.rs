@@ -1,10 +1,11 @@
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, sync::Arc};
 use tokio::sync::RwLock;
+use uuid::Uuid;
 
-use crate::database::base::{DatabaseInit, DatabaseRead, DatabaseWrite, TransactionWrite};
+use crate::database::base::{DatabaseError, DatabaseInit};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Transaction {
@@ -48,7 +49,6 @@ impl Display for Transaction {
 pub enum TransactionError {
     SaveError(String),
     FindError(String),
-    DeleteError(String),
 }
 
 impl Display for TransactionError {
@@ -60,23 +60,32 @@ impl Display for TransactionError {
             TransactionError::SaveError(e) => {
                 write!(f, "TransactionError -> SaveError, {}", e)
             }
-            TransactionError::DeleteError(e) => {
-                write!(f, "TransactionError -> DeleteError, {}", e)
-            }
         }
     }
 }
 
+pub trait TransactionWrite {
+    async fn create_transaction(
+        &mut self,
+        create_transaction: CreateTransaction,
+    ) -> Result<Uuid, DatabaseError>;
+    async fn delete_transactions(&mut self) -> Result<(), DatabaseError>;
+}
+
+pub trait TransactionRead {
+    async fn get_transaction(&self, id: &str) -> Result<Option<Transaction>, DatabaseError>;
+}
+
 pub struct TransactionService<T>
 where
-    for<'a> T: DatabaseInit + DatabaseWrite + DatabaseRead,
+    for<'a> T: DatabaseInit + TransactionWrite + TransactionRead,
 {
     db: Arc<RwLock<T>>,
 }
 
 impl<T> TransactionService<T>
 where
-    for<'a> T: DatabaseInit + DatabaseWrite + DatabaseRead + TransactionWrite,
+    for<'a> T: DatabaseInit + TransactionWrite + TransactionRead,
 {
     pub fn new(db: T) -> TransactionService<T> {
         let db = Arc::new(RwLock::new(db));
@@ -90,21 +99,7 @@ where
         let mut db_connection = self.db.write().await;
 
         db_connection
-            .save::<CreateTransaction>(create_transaction)
-            .await
-            .map_err(|e| TransactionError::SaveError(e.to_string()))?;
-
-        Ok(())
-    }
-
-    pub async fn update_transaction(
-        &self,
-        create_transaction: CreateTransaction,
-    ) -> Result<(), TransactionError> {
-        let mut db_connection = self.db.write().await;
-
-        db_connection
-            .save::<CreateTransaction>(create_transaction)
+            .create_transaction(create_transaction)
             .await
             .map_err(|e| TransactionError::SaveError(e.to_string()))?;
 
@@ -115,10 +110,10 @@ where
         &self,
         id: &str,
     ) -> Result<Option<Transaction>, TransactionError> {
-        let mut db_connection = self.db.write().await;
+        let db_connection = self.db.write().await;
 
         let transaction: Option<Transaction> = db_connection
-            .find(id)
+            .get_transaction(id)
             .await
             .map_err(|e| TransactionError::FindError(e.to_string()))?;
 
@@ -126,25 +121,11 @@ where
     }
 
     pub async fn find_transactions(&self) -> Result<Vec<Transaction>, TransactionError> {
-        let mut db_connection = self.db.write().await;
-
-        let transactions: Vec<Transaction> = db_connection
-            .find_all()
-            .await
-            .map_err(|e| TransactionError::FindError(e.to_string()))?;
-
-        return Ok(transactions);
+        todo!();
     }
 
-    pub async fn delete_transaction(&self, id: &str) -> Result<bool, TransactionError> {
-        let mut db_connection = self.db.write().await;
-
-        let has_deleted = db_connection
-            .delete(id)
-            .await
-            .map_err(|e| TransactionError::DeleteError(e.to_string()))?;
-
-        return Ok(has_deleted);
+    pub async fn delete_transaction(&self, _id: &str) -> Result<bool, TransactionError> {
+        todo!();
     }
     // there will need to be something to do with categorising the transactions
 }

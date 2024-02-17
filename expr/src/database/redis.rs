@@ -4,7 +4,9 @@ use redis::{Commands, Value};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
-use super::base::{DatabaseError, DatabaseInit, DatabaseRead, DatabaseWrite, TransactionWrite};
+use crate::service::transaction::TransactionWrite;
+
+use super::base::{DatabaseError, DatabaseInit, DatabaseRead, DatabaseWrite};
 
 pub struct Redis {
     client: Option<Arc<RwLock<redis::Client>>>,
@@ -12,7 +14,7 @@ pub struct Redis {
 }
 
 impl Redis {
-    pub fn new() -> Self {
+    pub fn _new() -> Self {
         Self {
             client: None,
             connection: None,
@@ -258,8 +260,8 @@ impl DatabaseRead for Redis {
 
 impl TransactionWrite for Redis {
     async fn create_transaction(
-        self,
-        create_transaction: crate::service::transaction::CreateTransaction,
+        &mut self,
+        _create_transaction: crate::service::transaction::CreateTransaction,
     ) -> Result<(), DatabaseError> {
         todo!()
     }

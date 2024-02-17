@@ -5,6 +5,7 @@ use crate::{
     service::transaction::{CreateTransaction, TransactionService},
 };
 
+#[allow(dead_code)]
 pub struct Cli {
     transaction_service: TransactionService<TextFile>,
 }

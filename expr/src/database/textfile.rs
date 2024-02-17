@@ -3,7 +3,9 @@ use std::{
     io::Write,
 };
 
-use super::base::{DatabaseError, DatabaseInit, DatabaseRead, DatabaseWrite, TransactionWrite};
+use crate::service::transaction::{TransactionRead, TransactionWrite};
+
+use super::base::{DatabaseError, DatabaseInit, DatabaseRead, DatabaseWrite};
 
 pub struct TextFile {
     filename: &'static str,
@@ -85,9 +87,18 @@ impl DatabaseWrite for TextFile {
 
 impl TransactionWrite for TextFile {
     async fn create_transaction(
-        self,
-        create_transaction: crate::service::transaction::CreateTransaction,
+        &mut self,
+        _create_transaction: crate::service::transaction::CreateTransaction,
     ) -> Result<(), DatabaseError> {
+        todo!()
+    }
+}
+
+impl TransactionRead for TextFile {
+    async fn get_transaction(
+        &self,
+        _id: &str,
+    ) -> Result<Option<crate::service::transaction::Transaction>, DatabaseError> {
         todo!()
     }
 }
