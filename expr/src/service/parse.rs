@@ -3,15 +3,15 @@ use std::{
     sync::Arc,
 };
 
-use chrono::NaiveDateTime;
+use chrono::{NaiveDate, NaiveDateTime};
 use tokio::sync::RwLock;
 
-use crate::database::redis::Redis;
+use crate::database::postgres::Postgres;
 
 use super::transaction::{CreateTransaction, TransactionService};
 
 pub struct Service {
-    transaction_service: Arc<RwLock<TransactionService<Redis>>>,
+    transaction_service: Arc<RwLock<TransactionService<Postgres>>>,
 }
 
 // column position of the given columns
@@ -25,7 +25,7 @@ pub struct Config {
 pub enum ParseError {
     RecordError(String),
     AmountConversionError(String),
-    RwLockError(String),
+    DateConversionError(String),
     SaveError(String),
 }
 
@@ -34,17 +34,16 @@ impl Display for ParseError {
         match self {
             ParseError::RecordError(e) => write!(f, "RecordError: {}", e),
             ParseError::AmountConversionError(e) => write!(f, "AmountConversionError: {}", e),
-            ParseError::RwLockError(e) => write!(f, "RwLockError: {}", e),
             ParseError::SaveError(e) => write!(f, "SaveError: {}", e),
+            ParseError::DateConversionError(e) => write!(f, "DateConversionError: {}", e),
         }
     }
 }
 
 impl Service {
-    pub fn new() -> Self {
-        let db = Redis::new();
+    pub fn new(transaction_service: Arc<RwLock<TransactionService<Postgres>>>) -> Self {
         Self {
-            transaction_service: Arc::new(RwLock::new(TransactionService::new(db))),
+            transaction_service,
         }
     }
 
@@ -67,11 +66,18 @@ impl Service {
                 .parse::<f64>()
                 .map_err(|e| ParseError::AmountConversionError(e.to_string()))?;
 
+            let pd = NaiveDate::parse_from_str(date, "%d/%m/%Y")
+                .map_err(|e| ParseError::DateConversionError(e.to_string()))?;
+
+            let empty_time = match chrono::NaiveTime::from_hms_opt(0, 0, 0) {
+                Some(time) => time,
+                None => return Err(ParseError::DateConversionError("Invalid time".to_string())),
+            };
+
             let new_transaction = CreateTransaction {
                 account_type: extraction_config.name.clone(),
                 amount,
-                payment_date: NaiveDateTime::parse_from_str(date, "%Y/%m/%d")
-                    .map_err(|e| ParseError::SaveError(e.to_string()))?,
+                payment_date: NaiveDateTime::new(pd, empty_time),
                 description: description.to_string(),
             };
 

@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use tokio::sync::RwLock;
 
 use crate::{
-    database::redis::Redis,
+    database::postgres::Postgres,
     service::{
         parse::{Config, Service},
         transaction::TransactionService,
@@ -20,14 +20,19 @@ use crate::{
 
 pub struct Server {
     parse_service: Arc<RwLock<Service>>,
-    transactions_service: Arc<RwLock<TransactionService<Redis>>>,
+    transactions_service: Arc<RwLock<TransactionService<Postgres>>>,
 }
 
 impl Server {
     pub fn new() -> Self {
+        let pg_connection_string = env!("DATABASE_URL");
+        println!("Using connection string: {}", pg_connection_string);
+        let t_service = Arc::new(RwLock::new(TransactionService::new(Postgres::new(
+            pg_connection_string,
+        ))));
         Self {
-            parse_service: Arc::new(RwLock::new(Service::new())),
-            transactions_service: Arc::new(RwLock::new(TransactionService::new(Redis::new()))),
+            parse_service: Arc::new(RwLock::new(Service::new(t_service.clone()))),
+            transactions_service: t_service,
         }
     }
 
@@ -105,7 +110,7 @@ async fn upload(
 
 async fn get_transaction(
     Path(id): Path<String>,
-    Extension(transaction_service): Extension<Arc<RwLock<TransactionService<Redis>>>>,
+    Extension(transaction_service): Extension<Arc<RwLock<TransactionService<Postgres>>>>,
 ) -> Result<Json<Value>, ServerError> {
     let ts = transaction_service.read().await;
 
@@ -129,7 +134,7 @@ async fn get_transaction(
 }
 
 async fn get_transactions(
-    Extension(transaction_service): Extension<Arc<RwLock<TransactionService<Redis>>>>,
+    Extension(transaction_service): Extension<Arc<RwLock<TransactionService<Postgres>>>>,
 ) -> Result<Json<Value>, ServerError> {
     let ts = transaction_service.read().await;
 
@@ -143,7 +148,7 @@ async fn get_transactions(
 
 async fn delete_transaction(
     Path(id): Path<String>,
-    Extension(transaction_service): Extension<Arc<RwLock<TransactionService<Redis>>>>,
+    Extension(transaction_service): Extension<Arc<RwLock<TransactionService<Postgres>>>>,
 ) -> Result<StatusCode, ServerError> {
     let ts = transaction_service.read().await;
 

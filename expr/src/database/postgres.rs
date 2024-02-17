@@ -1,25 +1,40 @@
+use std::sync::Arc;
+
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::service::transaction::{CreateTransaction, Transaction};
+use crate::service::transaction::{
+    CreateTransaction, Transaction, TransactionRead, TransactionWrite,
+};
 
 use super::base::{DatabaseError, DatabaseInit, DatabaseRead, DatabaseWrite};
 
 pub struct Postgres {
+    connection_string: Arc<str>,
     pool: Option<PgPool>,
 }
 
 impl Postgres {
-    pub fn new() -> Self {
-        Self { pool: None }
+    pub fn new(connection_string: &str) -> Self {
+        Self {
+            pool: None,
+            connection_string: connection_string.into(),
+        }
     }
 }
 
 impl DatabaseInit for Postgres {
     async fn connect(&mut self) -> Result<(), DatabaseError> {
-        let pool = PgPool::connect("")
-            .await
-            .map_err(|e| DatabaseError::ConnectionError(e.to_string()))?;
+        println!("Connecting to postgres");
+        let pool = match PgPool::connect(self.connection_string.as_ref()).await {
+            Ok(pool) => pool,
+            Err(e) => {
+                eprintln!("Error connecting to postgres: {}", e);
+                return Err(DatabaseError::ConnectionError(e.to_string()));
+            }
+        };
+
+        println!("Connected to postgres");
 
         self.pool = Some(pool);
 
@@ -40,7 +55,7 @@ impl DatabaseInit for Postgres {
 impl DatabaseRead for Postgres {
     async fn find<T: for<'a> serde::Deserialize<'a>>(
         &mut self,
-        id: &str,
+        _id: &str,
     ) -> Result<Option<T>, DatabaseError> {
         todo!()
     }
@@ -55,7 +70,7 @@ impl DatabaseRead for Postgres {
 impl DatabaseWrite for Postgres {
     async fn save<T: ToString + serde::Serialize>(
         &mut self,
-        record: T,
+        _record: T,
     ) -> Result<String, DatabaseError> {
         if self.pool.is_some() {
             self.connect().await?;
@@ -70,18 +85,22 @@ impl DatabaseWrite for Postgres {
         return Ok("".to_string());
     }
 
-    async fn delete(&mut self, id: &str) -> Result<bool, DatabaseError> {
+    async fn delete(&mut self, _id: &str) -> Result<bool, DatabaseError> {
         todo!()
     }
 }
 
-impl Postgres {
+impl TransactionWrite for Postgres {
     async fn create_transaction(
-        &self,
+        &mut self,
         create_transaction: CreateTransaction,
-    ) -> Result<(), DatabaseError> {
+    ) -> Result<Uuid, DatabaseError> {
+        if self.pool.is_none() {
+            self.connect().await?;
+        }
+
         if let Some(pool) = &self.pool {
-            let _res = sqlx::query!(
+            let res = sqlx::query!(
                 r#"
             INSERT INTO payment_transactions (account_type, payment_date, description, amount)
             VALUES ($1, $2, $3, $4)
@@ -96,13 +115,19 @@ impl Postgres {
             .await
             .map_err(|e| DatabaseError::SaveError(e.to_string()))?;
 
-            return Ok(());
+            return Ok(res.id);
         }
 
         return Err(DatabaseError::ConnectionError("No connection".to_string()));
     }
 
-    async fn get_transaction(&self, id: &str) -> Result<Transaction, DatabaseError> {
+    async fn delete_all_transactions(&mut self) -> Result<(), DatabaseError> {
+        todo!()
+    }
+}
+
+impl TransactionRead for Postgres {
+    async fn get_transaction(&self, id: &str) -> Result<Option<Transaction>, DatabaseError> {
         let id = Uuid::parse_str(id).map_err(|e| DatabaseError::GetError(e.to_string()))?;
 
         if let Some(pool) = &self.pool {

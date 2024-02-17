@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO payment_transactions (account_type, payment_date, description, amount)\n            VALUES ($1, $2, $3, $4)\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Timestamp",
+        "Text",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6bbee411bdf8e511fecbd145a638c6785690e1a7d087672d846a27c5924070e8"
+}
