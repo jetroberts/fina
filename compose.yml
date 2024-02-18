@@ -5,19 +5,13 @@ services:
     image: fina
     build:
       context: ./
-      dockerfile: ./expr/Dockerfile
+      dockerfile: ./expr/Dockerfile.dev
     ports:
       - "50051:50051"
     networks:
-      - redis_network
       - postgres_network
-  redis:
-    image: redis/redis-stack
-    ports:
-      - "6379:6379"
-      - "13333:8001"
-    networks:
-      - redis_network
+    volumes:
+      - ./expr:/usr/src/app
   postgres:
     image: postgres
     restart: always
@@ -34,8 +28,6 @@ volumes:
   postgres_data: {}
 
 networks:
-  redis_network:
-    driver: bridge
   postgres_network:
     driver: bridge
 

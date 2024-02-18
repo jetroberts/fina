@@ -3,6 +3,7 @@ use std::{error::Error, fmt::Display, sync::Arc};
 use redis::{Commands, Value};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
+use uuid::Uuid;
 
 use crate::service::transaction::TransactionWrite;
 
@@ -262,12 +263,16 @@ impl TransactionWrite for Redis {
     async fn create_transaction(
         &mut self,
         _create_transaction: crate::service::transaction::CreateTransaction,
-    ) -> Result<(), DatabaseError> {
+    ) -> Result<Uuid, DatabaseError> {
+        todo!()
+    }
+
+    async fn delete_transactions(&mut self) -> Result<(), DatabaseError> {
         todo!()
     }
 }
 
 fn create_new_uuid() -> String {
     let id = uuid::Uuid::new_v4();
-    return id.to_string();
+    id.to_string()
 }

@@ -55,7 +55,11 @@ impl Service {
         let mut csv_reader = csv::Reader::from_reader(data.as_bytes());
         let transaction_service = self.transaction_service.write().await;
 
-        for record in csv_reader.records() {
+        for (index, record) in csv_reader.records().enumerate() {
+            if index == 0 {
+                continue;
+            }
+
             let r = record.map_err(|e| ParseError::RecordError(e.to_string()))?;
 
             let date = string_or_empty(r.get(extraction_config.date_position));

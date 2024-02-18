@@ -121,8 +121,8 @@ impl TransactionWrite for Postgres {
         return Err(DatabaseError::ConnectionError("No connection".to_string()));
     }
 
-    async fn delete_all_transactions(&mut self) -> Result<(), DatabaseError> {
-        todo!()
+    async fn delete_transactions(&mut self) -> Result<(), DatabaseError> {
+        todo!();
     }
 }
 
@@ -142,7 +142,7 @@ impl TransactionRead for Postgres {
             .await
             .map_err(|e| DatabaseError::GetError(e.to_string()))?;
 
-            println!("{:?}", record);
+            Ok(Some(record))
         }
 
         Err(DatabaseError::GetError("No connection".to_string()))

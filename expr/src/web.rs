@@ -1,14 +1,17 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Multipart, Path},
-    http::StatusCode,
+    extract::{MatchedPath, Multipart, Path},
+    http::{Request, StatusCode},
     response::{IntoResponse, Response},
     routing::{delete, get, post},
     Extension, Json, Router,
 };
 use serde_json::{json, Value};
 use tokio::sync::RwLock;
+use tower_http::trace::TraceLayer;
+use tracing::{debug, info_span};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::{
     database::postgres::Postgres,
@@ -37,6 +40,10 @@ impl Server {
     }
 
     pub async fn start(&self) -> Result<(), String> {
+        tracing_subscriber::registry()
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+
         let app = Router::new()
             .route("/", get("Ok"))
             .route("/upload", post(upload))
@@ -44,13 +51,24 @@ impl Server {
             .route("/transactions", get(get_transactions))
             .route("/transactions/:id", delete(delete_transaction))
             .layer(Extension(self.parse_service.clone()))
-            .layer(Extension(self.transactions_service.clone()));
+            .layer(Extension(self.transactions_service.clone()))
+            .layer(
+                TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
+                    let matched_path = request.extensions().get().map(MatchedPath::as_str);
+                    info_span!(
+                        "http_request",
+                        method = ?request.method(),
+                        matched_path,
+                    )
+                }),
+            );
 
         let listener = tokio::net::TcpListener::bind("0.0.0.0:50051")
             .await
             .expect("enable to bind to port 3000");
 
-        println!("Listening on port 3000");
+        tracing::debug!("Listening on {}", listener.local_addr().unwrap());
+
         axum::serve(listener, app)
             .await
             .expect("failed to run server");
@@ -81,6 +99,7 @@ async fn upload(
     Extension(parse_service): Extension<Arc<RwLock<Service>>>,
     mut multipart: Multipart,
 ) -> Result<StatusCode, ServerError> {
+    let ps = parse_service.write().await;
     while let Some(field) = multipart
         .next_field()
         .await
@@ -90,8 +109,6 @@ async fn upload(
             .text()
             .await
             .map_err(|e| ServerError::MultipartError(e.to_string()))?;
-
-        let ps = parse_service.write().await;
 
         let config = Config {
             name: "Amex".to_string(),

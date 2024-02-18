@@ -69,6 +69,7 @@ pub trait TransactionWrite {
         &mut self,
         create_transaction: CreateTransaction,
     ) -> Result<Uuid, DatabaseError>;
+
     async fn delete_transactions(&mut self) -> Result<(), DatabaseError>;
 }
 

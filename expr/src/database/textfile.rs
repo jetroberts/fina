@@ -3,6 +3,8 @@ use std::{
     io::Write,
 };
 
+use uuid::Uuid;
+
 use crate::service::transaction::{TransactionRead, TransactionWrite};
 
 use super::base::{DatabaseError, DatabaseInit, DatabaseRead, DatabaseWrite};
@@ -89,7 +91,11 @@ impl TransactionWrite for TextFile {
     async fn create_transaction(
         &mut self,
         _create_transaction: crate::service::transaction::CreateTransaction,
-    ) -> Result<(), DatabaseError> {
+    ) -> Result<Uuid, DatabaseError> {
+        todo!()
+    }
+
+    async fn delete_transactions(&mut self) -> Result<(), DatabaseError> {
         todo!()
     }
 }
