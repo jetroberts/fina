@@ -1,9 +1,5 @@
 use std::fmt::{self, Display};
 
-use serde::{Deserialize, Serialize};
-
-use crate::service::transaction::{CreateTransaction, Transaction};
-
 pub enum DatabaseError {
     ConnectionError(String),
     ClientError(String),

@@ -3,7 +3,7 @@ use std::{error::Error, fmt::Display, sync::Arc};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::service::transaction::TransactionWrite;
+use crate::{models::transaction::CreateTransaction, service::transaction::TransactionWrite};
 
 use super::base::{DatabaseError, DatabaseInit};
 
@@ -59,7 +59,7 @@ impl DatabaseInit for Redis {
     }
 
     async fn disconnect(&mut self) -> Result<(), DatabaseError> {
-        // TODO: improve this disconnect function. Currently this is a memory leak
+        // TODO: improve this disconnect function. Currently not destorying the connectionh
         self.connection = None;
         self.client = None;
         Ok(())
@@ -68,18 +68,13 @@ impl DatabaseInit for Redis {
 
 impl TransactionWrite for Redis {
     async fn create_transaction(
-        &mut self,
-        _create_transaction: crate::service::transaction::CreateTransaction,
+        &self,
+        _create_transaction: CreateTransaction,
     ) -> Result<Uuid, DatabaseError> {
         todo!()
     }
 
-    async fn delete_transactions(&mut self) -> Result<(), DatabaseError> {
+    async fn delete_transaction(&self, id: &str) -> Result<(), DatabaseError> {
         todo!()
     }
-}
-
-fn create_new_uuid() -> String {
-    let id = uuid::Uuid::new_v4();
-    id.to_string()
 }

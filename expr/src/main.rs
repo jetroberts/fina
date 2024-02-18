@@ -2,6 +2,7 @@ use clap::Parser;
 
 mod cli;
 mod database;
+mod models;
 mod service;
 mod web;
 
@@ -17,7 +18,7 @@ struct Args {
 async fn main() {
     let args = Args::parse();
     if args.enable_server {
-        let server = web::Server::new();
+        let server = web::Server::new().await;
         match server.start().await {
             Ok(_) => (),
             Err(e) => eprintln!("Error: {}", e),

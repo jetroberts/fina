@@ -1,50 +1,12 @@
-use chrono::NaiveDateTime;
 use core::fmt;
-use serde::{Deserialize, Serialize};
 use std::{fmt::Display, sync::Arc};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::database::base::{DatabaseError, DatabaseInit};
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Transaction {
-    pub id: String,
-    pub account_type: String,
-    pub payment_date: NaiveDateTime,
-    pub amount: f64,
-    pub description: String,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateTransaction {
-    pub account_type: String,
-    pub payment_date: NaiveDateTime,
-    pub amount: f64,
-    pub description: String,
-}
-
-impl Display for CreateTransaction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "account_type: {}, date: {}, amount: {}",
-            self.account_type, self.payment_date, self.amount
-        )
-    }
-}
-
-impl Display for Transaction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Id: {}\n, Type: {}\nDate: {}\nAmount: {}\nDescription: {}",
-            self.id, self.account_type, self.payment_date, self.amount, self.description
-        )
-    }
-}
+use crate::{
+    database::base::{DatabaseError, DatabaseInit},
+    models::transaction::{CreateTransaction, Transaction},
+};
 
 pub enum TransactionError {
     SaveError(String),
@@ -66,15 +28,16 @@ impl Display for TransactionError {
 
 pub trait TransactionWrite {
     async fn create_transaction(
-        &mut self,
+        &self,
         create_transaction: CreateTransaction,
     ) -> Result<Uuid, DatabaseError>;
 
-    async fn delete_transactions(&mut self) -> Result<(), DatabaseError>;
+    async fn delete_transaction(&self, id: &str) -> Result<(), DatabaseError>;
 }
 
 pub trait TransactionRead {
     async fn get_transaction(&self, id: &str) -> Result<Option<Transaction>, DatabaseError>;
+    async fn get_transactions(&self) -> Result<Vec<Transaction>, DatabaseError>;
 }
 
 pub struct TransactionService<T>
@@ -97,7 +60,7 @@ where
         &self,
         create_transaction: CreateTransaction,
     ) -> Result<(), TransactionError> {
-        let mut db_connection = self.db.write().await;
+        let db_connection = self.db.write().await;
 
         db_connection
             .create_transaction(create_transaction)
@@ -111,7 +74,7 @@ where
         &self,
         id: &str,
     ) -> Result<Option<Transaction>, TransactionError> {
-        let db_connection = self.db.write().await;
+        let db_connection = self.db.read().await;
 
         let transaction: Option<Transaction> = db_connection
             .get_transaction(id)
@@ -122,11 +85,25 @@ where
     }
 
     pub async fn find_transactions(&self) -> Result<Vec<Transaction>, TransactionError> {
-        todo!();
+        let db_connection = self.db.read().await;
+
+        let transactions: Vec<Transaction> = db_connection
+            .get_transactions()
+            .await
+            .map_err(|e| TransactionError::FindError(e.to_string()))?;
+
+        return Ok(transactions);
     }
 
-    pub async fn delete_transaction(&self, _id: &str) -> Result<bool, TransactionError> {
-        todo!();
+    pub async fn delete_transaction(&self, id: &str) -> Result<(), TransactionError> {
+        let db_connection = self.db.read().await;
+
+        let _ = db_connection
+            .delete_transaction(id)
+            .await
+            .map_err(|e| TransactionError::FindError(e.to_string()))?;
+
+        return Ok(());
     }
     // there will need to be something to do with categorising the transactions
 }

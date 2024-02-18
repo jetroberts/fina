@@ -1,8 +1,8 @@
 use chrono::NaiveDateTime;
 
 use crate::{
-    database::textfile::TextFile,
-    service::transaction::{CreateTransaction, TransactionService},
+    database::textfile::TextFile, models::transaction::CreateTransaction,
+    service::transaction::TransactionService,
 };
 
 #[allow(dead_code)]

@@ -8,13 +8,13 @@ use axum::{
     Extension, Json, Router,
 };
 use serde_json::{json, Value};
-use tokio::sync::RwLock;
+use tokio::{signal, sync::RwLock};
 use tower_http::trace::TraceLayer;
-use tracing::{debug, info_span};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing::info_span;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use crate::{
-    database::postgres::Postgres,
+    database::{base::DatabaseInit, postgres::Postgres},
     service::{
         parse::{Config, Service},
         transaction::TransactionService,
@@ -27,12 +27,20 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let pg_connection_string = env!("DATABASE_URL");
         println!("Using connection string: {}", pg_connection_string);
-        let t_service = Arc::new(RwLock::new(TransactionService::new(Postgres::new(
-            pg_connection_string,
-        ))));
+
+        let mut new_pg_service = Postgres::new(pg_connection_string);
+        match new_pg_service.connect().await {
+            Ok(_) => (),
+            Err(e) => {
+                // FIX ME - this should be a proper error
+                panic!("Failed to connect to database: {}", e);
+            }
+        }
+        let t_service = Arc::new(RwLock::new(TransactionService::new(new_pg_service)));
+
         Self {
             parse_service: Arc::new(RwLock::new(Service::new(t_service.clone()))),
             transactions_service: t_service,
@@ -41,6 +49,7 @@ impl Server {
 
     pub async fn start(&self) -> Result<(), String> {
         tracing_subscriber::registry()
+            .with(EnvFilter::new("info"))
             .with(tracing_subscriber::fmt::layer())
             .init();
 
@@ -70,10 +79,32 @@ impl Server {
         tracing::debug!("Listening on {}", listener.local_addr().unwrap());
 
         axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown())
             .await
             .expect("failed to run server");
 
         Ok(())
+    }
+}
+
+async fn shutdown() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to listen for ctrl_c event");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
     }
 }
 

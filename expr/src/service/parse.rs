@@ -6,9 +6,9 @@ use std::{
 use chrono::{NaiveDate, NaiveDateTime};
 use tokio::sync::RwLock;
 
-use crate::database::postgres::Postgres;
+use crate::{database::postgres::Postgres, models::transaction::CreateTransaction};
 
-use super::transaction::{CreateTransaction, TransactionService};
+use super::transaction::TransactionService;
 
 pub struct Service {
     transaction_service: Arc<RwLock<TransactionService<Postgres>>>,

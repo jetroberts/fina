@@ -2,7 +2,10 @@ use std::fs::{remove_file, File};
 
 use uuid::Uuid;
 
-use crate::service::transaction::{TransactionRead, TransactionWrite};
+use crate::{
+    models::transaction::{CreateTransaction, Transaction},
+    service::transaction::{TransactionRead, TransactionWrite},
+};
 
 use super::base::{DatabaseError, DatabaseInit};
 
@@ -39,27 +42,23 @@ impl DatabaseInit for TextFile {
 
 impl TransactionWrite for TextFile {
     async fn create_transaction(
-        &mut self,
-        _create_transaction: crate::service::transaction::CreateTransaction,
+        &self,
+        _create_transaction: CreateTransaction,
     ) -> Result<Uuid, DatabaseError> {
         todo!()
     }
 
-    async fn delete_transactions(&mut self) -> Result<(), DatabaseError> {
+    async fn delete_transaction(&self, id: &str) -> Result<(), DatabaseError> {
         todo!()
     }
 }
 
 impl TransactionRead for TextFile {
-    async fn get_transaction(
-        &self,
-        _id: &str,
-    ) -> Result<Option<crate::service::transaction::Transaction>, DatabaseError> {
+    async fn get_transaction(&self, _id: &str) -> Result<Option<Transaction>, DatabaseError> {
         todo!()
     }
-}
 
-fn create_new_uuid() -> String {
-    let id = uuid::Uuid::new_v4();
-    id.to_string()
+    async fn get_transactions(&self) -> Result<Vec<Transaction>, DatabaseError> {
+        todo!()
+    }
 }

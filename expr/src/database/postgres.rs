@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
 use sqlx::PgPool;
+use tracing::{error, info};
 use uuid::Uuid;
 
-use crate::service::transaction::{
-    CreateTransaction, Transaction, TransactionRead, TransactionWrite,
+use crate::{
+    models::transaction::{CreateTransaction, Transaction},
+    service::transaction::{TransactionRead, TransactionWrite},
 };
 
 use super::base::{DatabaseError, DatabaseInit};
@@ -25,16 +27,16 @@ impl Postgres {
 
 impl DatabaseInit for Postgres {
     async fn connect(&mut self) -> Result<(), DatabaseError> {
-        println!("Connecting to postgres");
+        info!("Connecting to postgres");
         let pool = match PgPool::connect(self.connection_string.as_ref()).await {
             Ok(pool) => pool,
             Err(e) => {
-                eprintln!("Error connecting to postgres: {}", e);
+                error!("Error connecting to postgres: {}", e);
                 return Err(DatabaseError::ConnectionError(e.to_string()));
             }
         };
 
-        println!("Connected to postgres");
+        info!("Connected to postgres");
 
         self.pool = Some(pool);
 
@@ -54,13 +56,9 @@ impl DatabaseInit for Postgres {
 
 impl TransactionWrite for Postgres {
     async fn create_transaction(
-        &mut self,
+        &self,
         create_transaction: CreateTransaction,
     ) -> Result<Uuid, DatabaseError> {
-        if self.pool.is_none() {
-            self.connect().await?;
-        }
-
         if let Some(pool) = &self.pool {
             let res = sqlx::query!(
                 r#"
@@ -83,8 +81,26 @@ impl TransactionWrite for Postgres {
         return Err(DatabaseError::ConnectionError("No connection".to_string()));
     }
 
-    async fn delete_transactions(&mut self) -> Result<(), DatabaseError> {
-        todo!();
+    async fn delete_transaction(&self, id: &str) -> Result<(), DatabaseError> {
+        let id = Uuid::parse_str(id).map_err(|e| DatabaseError::GetError(e.to_string()))?;
+
+        if let Some(pool) = &self.pool {
+            let _ = sqlx::query!(
+                r#"
+        DELETE FROM payment_transactions WHERE id = $1
+            "#,
+                id
+            )
+            .execute(pool)
+            .await
+            .map_err(|e| DatabaseError::DeleteError(e.to_string()));
+
+            return Ok(());
+        }
+
+        Err(DatabaseError::DeleteError(
+            "Unable to get connection".to_string(),
+        ))
     }
 }
 
@@ -108,5 +124,25 @@ impl TransactionRead for Postgres {
         }
 
         Err(DatabaseError::GetError("No connection".to_string()))
+    }
+
+    async fn get_transactions(&self) -> Result<Vec<Transaction>, DatabaseError> {
+        if let Some(pool) = &self.pool {
+            let records = sqlx::query_as!(
+                Transaction,
+                r#"
+            SELECT * FROM payment_transactions
+                "#
+            )
+            .fetch_all(pool)
+            .await
+            .map_err(|e| DatabaseError::GetError(e.to_string()))?;
+
+            return Ok(records);
+        }
+
+        Err(DatabaseError::GetError(
+            "No database connection".to_string(),
+        ))
     }
 }
