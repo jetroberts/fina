@@ -7,7 +7,7 @@ use crate::service::transaction::{
     CreateTransaction, Transaction, TransactionRead, TransactionWrite,
 };
 
-use super::base::{DatabaseError, DatabaseInit, DatabaseRead, DatabaseWrite};
+use super::base::{DatabaseError, DatabaseInit};
 
 pub struct Postgres {
     connection_string: Arc<str>,
@@ -49,44 +49,6 @@ impl DatabaseInit for Postgres {
         }
 
         return Ok(());
-    }
-}
-
-impl DatabaseRead for Postgres {
-    async fn find<T: for<'a> serde::Deserialize<'a>>(
-        &mut self,
-        _id: &str,
-    ) -> Result<Option<T>, DatabaseError> {
-        todo!()
-    }
-
-    async fn find_all<T: for<'a> serde::Deserialize<'a> + Send>(
-        &mut self,
-    ) -> Result<Vec<T>, DatabaseError> {
-        todo!()
-    }
-}
-
-impl DatabaseWrite for Postgres {
-    async fn save<T: ToString + serde::Serialize>(
-        &mut self,
-        _record: T,
-    ) -> Result<String, DatabaseError> {
-        if self.pool.is_some() {
-            self.connect().await?;
-        }
-
-        // somehow need to have a save query that can be used for all tables
-
-        // here the problem is that we need to know the table name and the columns
-        // so we can build the query
-        // each service should have a query that allows it to pull data
-
-        return Ok("".to_string());
-    }
-
-    async fn delete(&mut self, _id: &str) -> Result<bool, DatabaseError> {
-        todo!()
     }
 }
 
@@ -142,7 +104,7 @@ impl TransactionRead for Postgres {
             .await
             .map_err(|e| DatabaseError::GetError(e.to_string()))?;
 
-            Ok(Some(record))
+            return Ok(Some(record));
         }
 
         Err(DatabaseError::GetError("No connection".to_string()))

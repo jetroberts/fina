@@ -44,22 +44,3 @@ pub trait DatabaseInit {
 pub trait GetId {
     fn get_id(&self) -> String;
 }
-
-pub trait DatabaseWrite {
-    // do I want to split save into create and update? For nosql it's not an issue for sql it
-    // probably will be
-    async fn save<T: ToString + Serialize>(&mut self, record: T) -> Result<String, DatabaseError>;
-    // may want to implement a soft delete
-    async fn delete(&mut self, id: &str) -> Result<bool, DatabaseError>;
-}
-
-pub trait DatabaseRead {
-    async fn find<T: for<'a> Deserialize<'a>>(
-        &mut self,
-        id: &str,
-    ) -> Result<Option<T>, DatabaseError>;
-
-    async fn find_all<T: for<'a> Deserialize<'a> + Send>(
-        &mut self,
-    ) -> Result<Vec<T>, DatabaseError>;
-}
